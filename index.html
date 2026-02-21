@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antennekaart NL — Antenne-installaties Nederland</title>
+<meta name="description" content="Interactieve kaart van alle antenne-installaties in Nederland. Data van het Antenneregister (RDI).">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e17;
+  --bg-panel: #111827;
+  --bg-card: #1a2235;
+  --bg-hover: #243049;
+  --border: #2a3654;
+  --text: #e2e8f0;
+  --text-dim: #8896b3;
+  --text-muted: #5a6a8a;
+  --accent-5g: #00ff88;
+  --accent-4g: #3b82f6;
+  --accent-3g: #f59e0b;
+  --accent-2g: #ef4444;
+  --accent-vv: #a855f7;
+  --accent-other: #6b7280;
+  --glow-5g: rgba(0,255,136,0.15);
+  --glow-4g: rgba(59,130,246,0.15);
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --radius: 8px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* ═══ MAP ═══ */
+#map {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.leaflet-container { background: var(--bg) !important; }
+.leaflet-tile-pane { filter: saturate(0.3) brightness(0.65) contrast(1.1); }
+.leaflet-control-zoom { border: 1px solid var(--border) !important; }
+.leaflet-control-zoom a {
+  background: var(--bg-panel) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.leaflet-control-zoom a:hover { background: var(--bg-hover) !important; }
+.leaflet-control-attribution {
+  background: rgba(10,14,23,0.8) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a { color: var(--text-dim) !important; }
+
+/* ═══ SEARCH BAR ═══ */
+#search-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#search-input {
+  width: 340px;
+  padding: 12px 16px 12px 40px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  backdrop-filter: blur(12px);
+}
+
+#search-input:focus {
+  border-color: var(--accent-4g);
+  box-shadow: 0 0 0 3px var(--glow-4g);
+}
+
+#search-input::placeholder { color: var(--text-muted); }
+
+.search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  font-size: 16px;
+}
+
+/* ═══ HEADER BADGE ═══ */
+#header-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(12px);
+  user-select: none;
+}
+
+#header-badge .pulse {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-5g);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--glow-5g); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px transparent; }
+}
+
+/* ═══ STATS BAR ═══ */
+#stats-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 1000;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.stat-chip {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  backdrop-filter: blur(12px);
+}
+
+.stat-chip:hover { background: var(--bg-hover); }
+.stat-chip.active { border-color: var(--accent-4g); background: rgba(59,130,246,0.1); }
+.stat-chip.disabled { opacity: 0.4; }
+.stat-chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ═══ DETAIL PANEL ═══ */
+#detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 420px;
+  height: 100vh;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  z-index: 1000;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#detail-panel.open { transform: translateX(0); }
+
+#detail-panel::-webkit-scrollbar { width: 6px; }
+#detail-panel::-webkit-scrollbar-track { background: transparent; }
+#detail-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.panel-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 1;
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+.panel-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.panel-close:hover { background: var(--bg-hover); color: var(--text); }
+
+.panel-body { padding: 16px 20px; }
+
+/* Tech badges */
+.tech-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tech-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.tech-badge.t5g { background: rgba(0,255,136,0.12); color: var(--accent-5g); border: 1px solid rgba(0,255,136,0.25); }
+.tech-badge.t4g { background: rgba(59,130,246,0.12); color: var(--accent-4g); border: 1px solid rgba(59,130,246,0.25); }
+.tech-badge.t3g { background: rgba(245,158,11,0.12); color: var(--accent-3g); border: 1px solid rgba(245,158,11,0.25); }
+.tech-badge.t2g { background: rgba(239,68,68,0.12); color: var(--accent-2g); border: 1px solid rgba(239,68,68,0.25); }
+.tech-badge.tvv { background: rgba(168,85,247,0.12); color: var(--accent-vv); border: 1px solid rgba(168,85,247,0.25); }
+
+/* Info grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.info-cell {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.info-cell.full { grid-column: 1 / -1; }
+
+.info-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Antenna groups */
+.section-title {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-family: var(--font-mono);
+  margin: 20px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.antenna-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+}
+
+.antenna-group:hover { border-color: var(--text-muted); }
+
+.antenna-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.antenna-group-type {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.antenna-group-dir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.dir-arrow {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dir-arrow::after {
+  content: '';
+  width: 2px;
+  height: 8px;
+  background: var(--accent-4g);
+  border-radius: 1px;
+  transform-origin: bottom center;
+}
+
+.antenna-specs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.spec {
+  text-align: center;
+}
+
+.spec-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.spec-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Loading */
+.loading-indicator {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  display: none;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(12px);
+}
+
+.loading-indicator.visible { display: flex; }
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent-4g);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Antenna count badge on map */
+.antenna-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--text);
+  border-radius: 50%;
+  border: 2px solid;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  #detail-panel { width: 100vw; }
+  #search-input { width: 240px; }
+  #header-badge { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="header-badge">
+  <span class="pulse"></span>
+  <span>ANTENNEKAART</span>
+</div>
+
+<div id="search-bar">
+  <div style="position:relative">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="search-input" placeholder="Zoek postcode, stad of adres..." autocomplete="off">
+  </div>
+</div>
+
+<div class="loading-indicator" id="loading">
+  <div class="spinner"></div>
+  <span>Antennes laden...</span>
+</div>
+
+<div id="stats-bar"></div>
+
+<div id="map"></div>
+
+<div id="detail-panel">
+  <div class="panel-header">
+    <div>
+      <div class="panel-title" id="panel-title"></div>
+      <div class="panel-subtitle" id="panel-subtitle"></div>
+    </div>
+    <button class="panel-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══ RD New (EPSG:28992) ↔ WGS84 conversion ═══
+const RD = {
+  x0: 155000.04, y0: 463000.05,
+  phi0: 52.15517440, lam0: 5.38720621,
+
+  toWGS84(x, y) {
+    const dx = (x - this.x0) * 1e-5;
+    const dy = (y - this.y0) * 1e-5;
+
+    const Kp = [0,2,0,2,0,2,1,4,2,4,1];
+    const Kq = [1,0,2,1,3,2,0,0,3,1,1];
+    const Kphi = [3235.65389,-32.58297,-0.24750,-0.84978,
+      -0.06550,-0.01709,-0.00738,0.00530,-0.00039,0.00033,-0.00012];
+
+    const Lp = [1,1,1,3,1,3,0,3,1,0,2,5];
+    const Lq = [0,1,2,0,3,1,1,2,4,2,0,0];
+    const Llam = [5260.52916,105.94684,2.45089,
+      -0.81885,0.05594,-0.05607,0.01199,-0.00256,0.00128,0.00022,-0.00022,0.00026];
+
+    let phi = 0, lam = 0;
+    for (let i = 0; i < Kphi.length; i++) phi += Kphi[i] * Math.pow(dx, Kp[i]) * Math.pow(dy, Kq[i]);
+    for (let i = 0; i < Llam.length; i++) lam += Llam[i] * Math.pow(dx, Lp[i]) * Math.pow(dy, Lq[i]);
+
+    return [this.phi0 + phi / 3600, this.lam0 + lam / 3600];
+  },
+
+  fromWGS84(lat, lon) {
+    const dphi = 0.36 * (lat - this.phi0);
+    const dlam = 0.36 * (lon - this.lam0);
+
+    const Rp = [0,1,2,0,1,3,1,0,2];
+    const Rq = [1,1,1,3,0,1,3,2,3];
+    const Rx = [190094.945,-11832.228,-114.221,-32.391,
+      -0.705,-2.340,-0.608,-0.008,0.148];
+
+    const Sp = [1,0,2,1,3,0,2,1,0,1];
+    const Sq = [0,2,0,2,0,1,2,1,4,4];
+    const Sy = [309056.544,3638.893,72.971,
+      -157.984,59.788,0.433,-6.439,-0.032,0.092,-0.054];
+
+    let x = 0, y = 0;
+    for (let i = 0; i < Rx.length; i++) x += Rx[i] * Math.pow(dphi, Rp[i]) * Math.pow(dlam, Rq[i]);
+    for (let i = 0; i < Sy.length; i++) y += Sy[i] * Math.pow(dphi, Sp[i]) * Math.pow(dlam, Sq[i]);
+
+    return [this.x0 + x, this.y0 + y];
+  }
+};
+
+// ═══ CONFIG ═══
+const WFS_BASE = '/wfs/';
+const TECH_COLORS = {
+  '5G NR': { color: '#00ff88', cls: 't5g', label: '5G' },
+  'LTE': { color: '#3b82f6', cls: 't4g', label: '4G' },
+  'UMTS': { color: '#f59e0b', cls: 't3g', label: '3G' },
+  'GSM': { color: '#ef4444', cls: 't2g', label: '2G' },
+  'VV': { color: '#a855f7', cls: 'tvv', label: 'Straal' },
+  'VASTE VERB': { color: '#a855f7', cls: 'tvv', label: 'Straal' },
+};
+
+function getTechColor(hoofdsoort) {
+  if (!hoofdsoort) return { color: '#6b7280', cls: '', label: 'Overig' };
+  const s = hoofdsoort.toUpperCase();
+  if (s.includes('5G')) return TECH_COLORS['5G NR'];
+  if (s.includes('LTE') || s.includes('4G')) return TECH_COLORS['LTE'];
+  if (s.includes('UMTS') || s.includes('3G')) return TECH_COLORS['UMTS'];
+  if (s.includes('GSM') || s.includes('2G')) return TECH_COLORS['GSM'];
+  if (s.includes('VAST') || s === 'VV') return TECH_COLORS['VV'];
+  return { color: '#6b7280', cls: '', label: hoofdsoort.slice(0, 12) };
+}
+
+function getPrimaryTech(props) {
+  if (props.VIJFG > 0) return TECH_COLORS['5G NR'];
+  if (props.VIERG > 0) return TECH_COLORS['LTE'];
+  if (props.DRIEG > 0) return TECH_COLORS['UMTS'];
+  if (props.TWEEG > 0) return TECH_COLORS['GSM'];
+  const h = (props.HOOFDSOORT || '').toUpperCase();
+  if (h.includes('VAST') || h.includes('VV')) return TECH_COLORS['VV'];
+  return { color: '#6b7280', cls: '', label: 'Overig' };
+}
+
+// ═══ MAP INIT ═══
+const map = L.map('map', {
+  center: [52.15, 5.38],
+  zoom: 8,
+  zoomControl: true,
+  attributionControl: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> · © <a href="https://carto.com/">CARTO</a> · Data: <a href="https://antenneregister.nl">Antenneregister (RDI)</a>',
+  subdomains: 'abcd',
+  maxZoom: 19
+}).addTo(map);
+
+// ═══ MARKERS ═══
+let markers = L.layerGroup().addTo(map);
+let currentMarkers = new Map(); // id -> marker
+let loadingTimeout = null;
+let activeFilters = new Set(['5G NR', 'LTE', 'UMTS', 'GSM', 'VV', 'OTHER']);
+let stats = { total: 0, '5G': 0, '4G': 0, '3G': 0, '2G': 0, 'VV': 0 };
+
+function createMarkerIcon(tech, count) {
+  const size = count > 5 ? 28 : count > 2 ? 24 : 20;
+  return L.divIcon({
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size/2, size/2],
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${tech.color}22;
+      border:2px solid ${tech.color};
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font-family:var(--font-mono);font-size:10px;font-weight:700;
+      color:${tech.color};
+      box-shadow:0 0 8px ${tech.color}33;
+      cursor:pointer;
+    ">${count > 1 ? count : ''}</div>`
+  });
+}
+
+// ═══ WFS FETCHING ═══
+async function fetchAntennas(bounds) {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const [x1, y1] = RD.fromWGS84(sw.lat, sw.lng);
+  const [x2, y2] = RD.fromWGS84(ne.lat, ne.lng);
+
+  const bbox = `${Math.floor(x1)},${Math.floor(y1)},${Math.ceil(x2)},${Math.ceil(y2)}`;
+  const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=500`;
+
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`WFS error: ${resp.status}`);
+  return resp.json();
+}
+
+async function fetchAntennaGroups(antIds) {
+  const ids = antIds.split(',').map(s => s.trim()).filter(Boolean);
+  if (ids.length === 0) return [];
+
+  const filter = ids.map(id => `AI_ID=${id}`).join(' OR ');
+  const url = `${WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`;
+
+  const resp = await fetch(url);
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return data.features || [];
+}
+
+// ═══ LOAD ANTENNAS ═══
+async function loadAntennas() {
+  const zoom = map.getZoom();
+  if (zoom < 11) {
+    markers.clearLayers();
+    currentMarkers.clear();
+    updateStats({});
+    return;
+  }
+
+  const loading = document.getElementById('loading');
+  loading.classList.add('visible');
+
+  try {
+    const data = await fetchAntennas(map.getBounds());
+    const features = data.features || [];
+
+    // Clear old markers
+    markers.clearLayers();
+    currentMarkers.clear();
+
+    const newStats = { total: features.length, '5G': 0, '4G': 0, '3G': 0, '2G': 0, 'VV': 0 };
+
+    features.forEach(f => {
+      const props = f.properties;
+      const tech = getPrimaryTech(props);
+      const [lat, lon] = RD.toWGS84(props.X, props.Y);
+
+      // Count stats
+      if (props.VIJFG > 0) newStats['5G']++;
+      if (props.VIERG > 0) newStats['4G']++;
+      if (props.DRIEG > 0) newStats['3G']++;
+      if (props.TWEEG > 0) newStats['2G']++;
+      if ((props.HOOFDSOORT || '').toUpperCase().includes('VAST')) newStats['VV']++;
+
+      // Filter check
+      const techKey = tech.label === '5G' ? '5G NR' : tech.label === '4G' ? 'LTE' :
+                      tech.label === '3G' ? 'UMTS' : tech.label === '2G' ? 'GSM' :
+                      tech.label === 'Straal' ? 'VV' : 'OTHER';
+      if (!activeFilters.has(techKey)) return;
+
+      const marker = L.marker([lat, lon], {
+        icon: createMarkerIcon(tech, props.AANTAL || 1)
+      });
+
+      marker.on('click', () => showDetail(props, lat, lon));
+      markers.addLayer(marker);
+      currentMarkers.set(props.ID, marker);
+    });
+
+    updateStats(newStats);
+  } catch (err) {
+    console.error('Fout bij laden antennes:', err);
+  } finally {
+    loading.classList.remove('visible');
+  }
+}
+
+// Debounced loading
+function scheduleLoad() {
+  clearTimeout(loadingTimeout);
+  loadingTimeout = setTimeout(loadAntennas, 400);
+}
+
+map.on('moveend', scheduleLoad);
+map.on('zoomend', scheduleLoad);
+
+// ═══ STATS BAR ═══
+function updateStats(s) {
+  const bar = document.getElementById('stats-bar');
+  const items = [
+    { key: '5G NR', label: '5G', count: s['5G'] || 0, color: '#00ff88' },
+    { key: 'LTE', label: '4G', count: s['4G'] || 0, color: '#3b82f6' },
+    { key: 'UMTS', label: '3G', count: s['3G'] || 0, color: '#f59e0b' },
+    { key: 'GSM', label: '2G', count: s['2G'] || 0, color: '#ef4444' },
+    { key: 'VV', label: 'Straal', count: s['VV'] || 0, color: '#a855f7' },
+  ];
+
+  bar.innerHTML = `<div class="stat-chip" style="pointer-events:none">
+    <span style="color:var(--text-dim)">${s.total || 0} sites</span>
+  </div>` + items.map(i => `
+    <div class="stat-chip ${activeFilters.has(i.key) ? 'active' : 'disabled'}"
+         onclick="toggleFilter('${i.key}')"
+         title="Filter ${i.label}">
+      <span class="dot" style="background:${i.color}"></span>
+      <span>${i.label}</span>
+      <span style="color:var(--text-muted)">${i.count}</span>
+    </div>
+  `).join('');
+}
+
+function toggleFilter(key) {
+  if (activeFilters.has(key)) activeFilters.delete(key);
+  else activeFilters.add(key);
+  loadAntennas();
+}
+
+// ═══ DETAIL PANEL ═══
+async function showDetail(props, lat, lon) {
+  const panel = document.getElementById('detail-panel');
+  const title = document.getElementById('panel-title');
+  const subtitle = document.getElementById('panel-subtitle');
+  const body = document.getElementById('panel-body');
+
+  title.textContent = props.WOONPLAATSNAAM || props.GEMEENTE || 'Onbekend';
+  subtitle.textContent = `${props.POSTCODE || '—'} · ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+
+  // Tech badges
+  const techs = (props.HOOFDSOORT || '').split(',').map(s => s.trim()).filter(Boolean);
+  const techBadges = techs.map(t => {
+    const tc = getTechColor(t);
+    return `<span class="tech-badge ${tc.cls}">${t}</span>`;
+  }).join('');
+
+  // Info grid
+  const infoHTML = `
+    <div class="tech-badges">${techBadges}</div>
+    <div class="info-grid">
+      <div class="info-cell">
+        <div class="info-label">Gemeente</div>
+        <div class="info-value">${props.GEMEENTE || '—'}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Installaties</div>
+        <div class="info-value">${props.AANTAL || '—'}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Small Cell</div>
+        <div class="info-value">${props.SMALL_CELL_INDICATOR || 'Nee'}</div>
+      </div>
+      <div class="info-cell">
+        <div class="info-label">Technologieën</div>
+        <div class="info-value" style="font-size:12px">
+          ${props.VIJFG > 0 ? '<span style="color:#00ff88">5G</span> ' : ''}
+          ${props.VIERG > 0 ? '<span style="color:#3b82f6">4G</span> ' : ''}
+          ${props.DRIEG > 0 ? '<span style="color:#f59e0b">3G</span> ' : ''}
+          ${props.TWEEG > 0 ? '<span style="color:#ef4444">2G</span> ' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+
+  body.innerHTML = infoHTML + `
+    <div class="section-title">Antenne-installaties</div>
+    <div id="groups-loading" style="text-align:center;padding:20px;color:var(--text-muted);font-family:var(--font-mono);font-size:12px">
+      <div class="spinner" style="margin:0 auto 8px"></div>
+      Detail data laden...
+    </div>
+  `;
+
+  panel.classList.add('open');
+
+  // Fetch antenna groups
+  if (props.ANT_IDS) {
+    try {
+      const groups = await fetchAntennaGroups(props.ANT_IDS);
+      const loadEl = document.getElementById('groups-loading');
+      if (!loadEl) return;
+
+      if (groups.length === 0) {
+        loadEl.innerHTML = '<span style="color:var(--text-muted)">Geen detail data beschikbaar</span>';
+        return;
+      }
+
+      // Group by AI_ID
+      const byAntenna = {};
+      groups.forEach(g => {
+        const aid = g.properties.AI_ID;
+        if (!byAntenna[aid]) byAntenna[aid] = [];
+        byAntenna[aid].push(g.properties);
+      });
+
+      let groupsHTML = '';
+      Object.entries(byAntenna).forEach(([aid, entries]) => {
+        const first = entries[0];
+        const tc = getTechColor(first.SAT_CODE);
+
+        groupsHTML += `<div class="antenna-group" style="border-left:3px solid ${tc.color}">
+          <div class="antenna-group-header">
+            <span class="antenna-group-type" style="color:${tc.color}">${first.SAT_CODE || 'Onbekend'}</span>
+            ${first.DIR_NONDIR === 'D' && first.HOOFDSTRAALRICHTING != null ? `
+              <span class="antenna-group-dir">
+                <span class="dir-arrow" style="transform:rotate(${first.HOOFDSTRAALRICHTING}deg)">
+                  <span style="display:block;width:2px;height:7px;background:${tc.color};border-radius:1px"></span>
+                </span>
+                ${first.HOOFDSTRAALRICHTING}°
+              </span>
+            ` : `<span class="antenna-group-dir">${first.DIR_NONDIR === 'N' ? 'Omnidirectioneel' : ''}</span>`}
+          </div>`;
+
+        entries.forEach(e => {
+          groupsHTML += `<div class="antenna-specs" style="margin-bottom:6px">
+            <div class="spec">
+              <div class="spec-val">${e.FREQUENTIE || '—'}</div>
+              <div class="spec-label">Frequentie</div>
+            </div>
+            <div class="spec">
+              <div class="spec-val">${e.ZENDVERMOGEN != null ? e.ZENDVERMOGEN + ' dBW' : '—'}</div>
+              <div class="spec-label">Vermogen</div>
+            </div>
+            <div class="spec">
+              <div class="spec-val">${e.HOOGTE != null ? e.HOOGTE + ' m' : '—'}</div>
+              <div class="spec-label">Hoogte</div>
+            </div>
+          </div>
+          <div class="antenna-specs">
+            <div class="spec">
+              <div class="spec-val">${e.HOOFDSTRAALRICHTING != null ? e.HOOFDSTRAALRICHTING + '°' : '—'}</div>
+              <div class="spec-label">Richting</div>
+            </div>
+            <div class="spec">
+              <div class="spec-val">${e.VEILIGE_AFSTAND != null && e.VEILIGE_AFSTAND >= 0 ? e.VEILIGE_AFSTAND + ' m' : '—'}</div>
+              <div class="spec-label">Veilige afst.</div>
+            </div>
+            <div class="spec">
+              <div class="spec-val" style="font-size:11px">${e.DATUM_INGEBRUIKNAME || '—'}</div>
+              <div class="spec-label">In gebruik</div>
+            </div>
+          </div>`;
+        });
+
+        groupsHTML += '</div>';
+      });
+
+      loadEl.outerHTML = groupsHTML;
+    } catch (err) {
+      console.error('Fout bij laden groepen:', err);
+      const loadEl = document.getElementById('groups-loading');
+      if (loadEl) loadEl.innerHTML = '<span style="color:#ef4444">Fout bij laden detail data</span>';
+    }
+  }
+}
+
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+}
+
+// ═══ SEARCH ═══
+const searchInput = document.getElementById('search-input');
+let searchTimeout;
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    clearTimeout(searchTimeout);
+    doSearch(searchInput.value);
+  }
+});
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => doSearch(searchInput.value), 800);
+});
+
+async function doSearch(query) {
+  if (!query || query.length < 2) return;
+
+  try {
+    const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Nederland')}&limit=1&countrycodes=nl`);
+    const results = await resp.json();
+
+    if (results.length > 0) {
+      const r = results[0];
+      map.setView([parseFloat(r.lat), parseFloat(r.lon)], 15);
+    }
+  } catch (err) {
+    console.error('Zoekfout:', err);
+  }
+}
+
+// ═══ KEYBOARD ═══
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePanel();
+  if (e.key === '/' && document.activeElement !== searchInput) {
+    e.preventDefault();
+    searchInput.focus();
+  }
+});
+
+// Initial stats
+updateStats({});
+</script>
+</body>
+</html>

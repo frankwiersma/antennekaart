@@ -1,0 +1,8 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/wfs/*"
+  to = "https://antenneregister.nl/mapserver/wfs/:splat"
+  status = 200
+  force = true
