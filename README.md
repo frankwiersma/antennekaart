@@ -15,7 +15,17 @@ Interactive map of all **35,519 antenna installations** and **391,453 antenna gr
 
 ## Data
 
-All data is sourced from the official [Antenneregister](https://antenneregister.nl) (RDI) via their WFS endpoint.
+Two complementary datasets in `data/`:
+
+**Official (Antenneregister.nl / RDI):**
+- `antennes.csv` — 35,519 locations with postcode, gemeente, tech types
+- `antennes_groepen.csv` — 391,453 antenna groups with frequency, power, height, direction, dates
+- Compressed GeoJSON versions (.json.gz)
+
+**Community (Antennekaart.nl):**
+- Per-technology GeoJSON: 5G, 4G, 3G, 2G, GSM-R, CDMA, CGC, fixed-wireless
+- `bts-all.json` — 39,715 BTS records with eNB IDs, TAC, provider, bands, last scanned
+- Provider identification (KPN, Odido, Vodafone, ProRail)
 
 See [`data/README.md`](data/README.md) for full schema documentation and API examples.
 

@@ -57,6 +57,74 @@ curl "https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&reques
 curl "https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=AI_ID=8945423867"
 ```
 
+---
+
+## Antennekaart.nl Data (Community / Crowd-Sourced)
+
+Additional data scraped from [antennekaart.nl](https://antennekaart.nl) which enriches the official register with provider identification, BTS metadata, and field scan results.
+
+Located in `antennekaart.nl/` subdirectory.
+
+### Files
+
+| File | Records | Description |
+|------|---------|-------------|
+| `5g.json` | 14,411 | 5G sites (GeoJSON with provider, bands, angles) |
+| `4g.json` | 16,164 | 4G sites |
+| `3g.json` | 5,280 | 3G sites |
+| `2g.json` | 10,263 | 2G sites |
+| `gsm-r.json` | 369 | GSM-R (ProRail train communications) |
+| `cdma.json` | 184 | CDMA (smart meter readout network) |
+| `cgc.json` | 7 | CGC (in-flight 4G internet) |
+| `fixed-wireless.json` | 13,900 | Microwave / fixed wireless links |
+| `bts-all.json` | 39,715 | All BTS records with eNB identifiers, TAC, provider, bands, last scanned |
+| `site-types.json` | 29 | Site type definitions (indoor, rooftop, mast, etc.) |
+
+### Properties per tower (GeoJSON)
+
+- `location_id` — Antennekaart.nl site ID
+- `coordinates` — [lon, lat] (WGS84)
+- `provider_id` — Network operator ID
+- `bands` — Frequency band numbers
+- `angles` — Antenna azimuth angles (degrees)
+- `is_kpn_huawei` — Huawei equipment flag (KPN sites)
+- `deleted` — Whether site is decommissioned
+
+### BTS Properties (bts-all.json)
+
+- `identifier` — eNB ID (4G) or equivalent
+- `tracking_area` — TAC (Tracking Area Code)
+- `last_scanned` — When this BTS was last detected in the field
+- `provider` — `{id, name, slug, mcc, mnc, color}`
+- `lat`, `lon` — Coordinates (WGS84)
+- `band_ids` — Active frequency band IDs
+
+### Providers
+
+| ID | Name | MCC-MNC | Color |
+|----|------|---------|-------|
+| 1 | KPN | 204-08 | #00FF00 |
+| 3 | Odido (T-Mobile) | 204-16 | #0084FF |
+| 4 | Vodafone | 204-04 | #FF0000 |
+| 5 | ProRail | — | #B20A2F |
+| 6 | Utility Connect | — | #00FFFF |
+| 7 | EAN (aviation) | — | #0000FF |
+
+### API Endpoints (antennekaart.nl)
+
+```bash
+# Map layer per technology (GeoJSON)
+curl "https://antennekaart.nl/api/v1/map/layer/4g/?bbox=5.0,52.0,5.5,52.5&zoom=12"
+
+# Location details
+curl "https://antennekaart.nl/api/v1/locations/{location_id}/"
+
+# BTS lookup by eNB identifier
+curl "https://antennekaart.nl/api/v1/bts/?radio_technology=lte&identifier=409040"
+```
+
+---
+
 ## License
 
-This data is published by the [Antennebureau](https://antennebureau.nl) / Rijksinspectie Digitale Infrastructuur (RDI) as open data.
+This data is published by the [Antennebureau](https://antennebureau.nl) / Rijksinspectie Digitale Infrastructuur (RDI) as open data. Antennekaart.nl data is community-sourced.
