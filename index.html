@@ -176,7 +176,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.p
 }).addTo(map);
 
 const markers=L.layerGroup().addTo(map);
-let active=new Set(['5G','4G','3G','2G','VV','OTHER']);
+let active=new Set(['5G','4G','3G','2G','VV','OTHER','ALL']);
 let stats={total:0,'5G':0,'4G':0,'3G':0,'2G':0,'VV':0};
 let loadTimer=null;
 
@@ -198,7 +198,7 @@ async function loadAntennas(){
     const b=map.getBounds(),sw=b.getSouthWest(),ne=b.getNorthEast();
     const[x1,y1]=RD.fromWGS(sw.lat,sw.lng),[x2,y2]=RD.fromWGS(ne.lat,ne.lng);
     const bbox=`${Math.floor(x1)},${Math.floor(y1)},${Math.ceil(x2)},${Math.ceil(y2)}`;
-    const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=800`);
+    const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=800`);
     const data=await r.json();
     const feats=data.features||[];
 
@@ -269,7 +269,7 @@ async function showDetail(p,lat,lon){
     try{
       const ids=p.ANT_IDS.split(',').map(s=>s.trim()).filter(Boolean);
       const filter=ids.map(id=>`AI_ID=${id}`).join(' OR ');
-      const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
       const data=await r.json();
       const groups=data.features||[];
 
