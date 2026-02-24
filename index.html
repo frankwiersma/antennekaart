@@ -84,10 +84,24 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .chip-total{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 
 /* Bottom right */
-.bottom-right{position:absolute;bottom:12px;right:12px;z-index:1000;display:flex;gap:6px}
+.bottom-right{position:absolute;bottom:12px;right:12px;z-index:1000;display:flex;gap:6px;align-items:flex-end}
 .br-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);color:var(--text2);transition:all .15s}
 .br-btn:hover{background:var(--surface2);color:var(--text)}
 .br-btn.copied{background:var(--green);color:#fff;border-color:var(--green)}
+
+/* Download menu */
+.dl-wrap{position:relative}
+.dl-menu{position:absolute;bottom:100%;right:0;margin-bottom:6px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;overflow:hidden;display:none;animation:dlIn .15s ease}
+.dl-menu.show{display:block}
+@keyframes dlIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.dl-menu-header{padding:8px 12px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-family:'JetBrains Mono',monospace;border-bottom:1px solid var(--border);background:var(--surface2)}
+.dl-item{padding:9px 12px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:8px;transition:background .1s;border-bottom:1px solid var(--border);color:var(--text)}
+.dl-item:last-child{border:none}
+.dl-item:hover{background:var(--surface2)}
+.dl-item .dl-icon{font-size:14px;width:20px;text-align:center;flex-shrink:0}
+.dl-item .dl-info{min-width:0}
+.dl-item .dl-label{font-weight:500}
+.dl-item .dl-desc{font-size:10px;color:var(--text3);margin-top:1px}
 
 /* Loading */
 .loader{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--text2);display:none;align-items:center;gap:8px;backdrop-filter:blur(12px);box-shadow:0 1px 6px rgba(0,0,0,.08)}
@@ -202,7 +216,18 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 <div class="filters" id="filters"></div>
 
 <div class="bottom-right">
-  <button class="br-btn" onclick="exportView()">📥 Export CSV</button>
+  <div class="dl-wrap">
+    <div class="dl-menu" id="dlMenu">
+      <div class="dl-menu-header">Download huidig beeld</div>
+      <div class="dl-item" onclick="exportCSV()"><span class="dl-icon">📊</span><div class="dl-info"><div class="dl-label">CSV</div><div class="dl-desc">Spreadsheet-compatibel</div></div></div>
+      <div class="dl-item" onclick="exportGeoJSON()"><span class="dl-icon">🗺️</span><div class="dl-info"><div class="dl-label">GeoJSON</div><div class="dl-desc">Voor GIS tools (QGIS, Mapbox)</div></div></div>
+      <div class="dl-item" onclick="exportKML()"><span class="dl-icon">📌</span><div class="dl-info"><div class="dl-label">KML</div><div class="dl-desc">Google Earth / Maps</div></div></div>
+      <div class="dl-menu-header">Volledige dataset</div>
+      <div class="dl-item" onclick="downloadFull('csv')"><span class="dl-icon">📁</span><div class="dl-info"><div class="dl-label">Antennes CSV <span style="color:var(--text3);font-weight:400">(4.5 MB)</span></div><div class="dl-desc">35.519 locaties</div></div></div>
+      <div class="dl-item" onclick="downloadFull('groepen')"><span class="dl-icon">📁</span><div class="dl-info"><div class="dl-label">Antenne-groepen CSV <span style="color:var(--text3);font-weight:400">(32 MB)</span></div><div class="dl-desc">391.453 records met freq/vermogen</div></div></div>
+    </div>
+    <button class="br-btn" onclick="toggleDL(event)">📥 Download</button>
+  </div>
   <button class="br-btn" id="copyBtn" onclick="copyLink()">🔗 Deel</button>
 </div>
 
@@ -648,21 +673,57 @@ function clearMeasure(){
   if(measureLine){map.removeLayer(measureLine);measureLine=null}
 }
 
-// ═══ EXPORT CSV ═══
-function exportView(){
-  if(!allFeatures.length){toast('Geen data om te exporteren');return}
+// ═══ DOWNLOAD MENU ═══
+function toggleDL(e){e&&e.stopPropagation();document.getElementById('dlMenu').classList.toggle('show')}
+document.addEventListener('click',e=>{if(!e.target.closest('.dl-wrap'))document.getElementById('dlMenu').classList.remove('show')});
+
+function dlFile(name,content,type='text/plain'){
+  const blob=new Blob(['\ufeff'+content],{type:type+';charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+
+function exportCSV(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
   const rows=[['Woonplaats','Gemeente','Postcode','Lat','Lon','5G','4G','3G','2G','Installaties','SmallCell','Technologie']];
   allFeatures.forEach(f=>{
-    const p=f.properties;
-    const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
     rows.push([p.WOONPLAATSNAAM||'',p.GEMEENTE||'',p.POSTCODE||'',lat.toFixed(6),lon.toFixed(6),p.VIJFG||0,p.VIERG||0,p.DRIEG||0,p.TWEEG||0,p.AANTAL||0,p.SMALL_CELL_INDICATOR||'Nee',p.HOOFDSOORT||'']);
   });
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download=`antennekaart_export_${new Date().toISOString().slice(0,10)}.csv`;a.click();
-  URL.revokeObjectURL(url);
-  toast(`${fmt(allFeatures.length)} locaties geëxporteerd`);
+  dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
+  toast(`${fmt(allFeatures.length)} locaties als CSV`);toggleDL();
+}
+
+function exportGeoJSON(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
+  const fc={type:'FeatureCollection',features:allFeatures.map(f=>{
+    const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    return{type:'Feature',geometry:{type:'Point',coordinates:[lon,lat]},properties:{
+      woonplaats:p.WOONPLAATSNAAM,gemeente:p.GEMEENTE,postcode:p.POSTCODE,
+      installaties:p.AANTAL,technologie:p.HOOFDSOORT,
+      '5g':p.VIJFG||0,'4g':p.VIERG||0,'3g':p.DRIEG||0,'2g':p.TWEEG||0,
+      small_cell:p.SMALL_CELL_INDICATOR||'Nee',ant_ids:p.ANT_IDS
+    }};
+  })};
+  dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.geojson`,JSON.stringify(fc,null,2),'application/json');
+  toast(`${fmt(allFeatures.length)} locaties als GeoJSON`);toggleDL();
+}
+
+function exportKML(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
+  const placemarks=allFeatures.map(f=>{
+    const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    const name=`${p.WOONPLAATSNAAM||p.GEMEENTE||'Antenne'} — ${p.HOOFDSOORT||''}`;
+    return`<Placemark><name>${name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</name><description>Gemeente: ${p.GEMEENTE||'—'}\nPostcode: ${p.POSTCODE||'—'}\nInstallaties: ${p.AANTAL||0}\n5G: ${p.VIJFG||0} | 4G: ${p.VIERG||0} | 3G: ${p.DRIEG||0} | 2G: ${p.TWEEG||0}</description><Point><coordinates>${lon},${lat},0</coordinates></Point></Placemark>`;
+  }).join('\n');
+  const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Antennekaart Export</name>\n${placemarks}\n</Document></kml>`;
+  dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.kml`,kml,'application/vnd.google-earth.kml+xml');
+  toast(`${fmt(allFeatures.length)} locaties als KML`);toggleDL();
+}
+
+function downloadFull(type){
+  if(type==='csv')window.open('https://raw.githubusercontent.com/frankwiersma/antennekaart/main/data/antennes.csv','_blank');
+  else window.open('https://raw.githubusercontent.com/frankwiersma/antennekaart/main/data/antennes_groepen.csv','_blank');
+  toast('Download gestart');toggleDL();
 }
 
 // ═══ COPY LINK ═══
@@ -681,7 +742,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='s'){e.preventDefault();toggleStats()}
   if(e.key==='m'){e.preventDefault();toggleMeasure()}
   if(e.key==='l'){e.preventDefault();geolocate()}
-  if(e.key==='e'){e.preventDefault();exportView()}
+  if(e.key==='e'){e.preventDefault();toggleDL()}
 });
 
 // ═══ INIT ═══
