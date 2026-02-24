@@ -1112,42 +1112,67 @@ function dlFile(name,content,type='text/plain'){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
 }
 
+function filteredFeatures(){
+  return allFeatures.filter(f=>{const t=primaryTech(f.properties);return active.has(t==='OTHER'?'OTHER':t)});
+}
+
+function enrichProps(p){
+  const key=p.ANT_IDS;
+  const groups=key&&beamCache[key];
+  if(!groups||!groups.length)return{hoogte:'',vermogen:'',veilig:'',richtingen:''};
+  const maxH=Math.max(...groups.map(g=>g.properties.HOOGTE||0));
+  const maxP=Math.max(...groups.map(g=>g.properties.ZENDVERMOGEN||0));
+  const safeMax=Math.max(...groups.map(g=>g.properties.VEILIGE_AFSTAND||0));
+  const dirs=[...new Set(groups.filter(g=>g.properties.DIR_NONDIR==='D'&&g.properties.HOOFDSTRAALRICHTING!=null).map(g=>g.properties.HOOFDSTRAALRICHTING))].sort((a,b)=>a-b);
+  return{hoogte:maxH||'',vermogen:maxP||'',veilig:safeMax||'',richtingen:dirs.length?dirs.join(';'):''};
+}
+
 function exportCSV(){
-  if(!allFeatures.length){toast('Geen data in beeld');return}
-  const rows=[['Woonplaats','Gemeente','Postcode','Lat','Lon','5G','4G','3G','2G','Installaties','SmallCell','Technologie']];
-  allFeatures.forEach(f=>{
+  const feats=filteredFeatures();
+  if(!feats.length){toast('Geen data in beeld');return}
+  const rows=[['Woonplaats','Gemeente','Postcode','Lat','Lon','5G','4G','3G','2G','Installaties','SmallCell','Technologie','Hoogte_m','Vermogen_dBW','Veilig_m','Richtingen']];
+  feats.forEach(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
-    rows.push([p.WOONPLAATSNAAM||'',p.GEMEENTE||'',p.POSTCODE||'',lat.toFixed(6),lon.toFixed(6),p.VIJFG||0,p.VIERG||0,p.DRIEG||0,p.TWEEG||0,p.AANTAL||0,p.SMALL_CELL_INDICATOR||'Nee',p.HOOFDSOORT||'']);
+    const e=enrichProps(p);
+    rows.push([p.WOONPLAATSNAAM||'',p.GEMEENTE||'',p.POSTCODE||'',lat.toFixed(6),lon.toFixed(6),p.VIJFG||0,p.VIERG||0,p.DRIEG||0,p.TWEEG||0,p.AANTAL||0,p.SMALL_CELL_INDICATOR||'Nee',p.HOOFDSOORT||'',e.hoogte,e.vermogen,e.veilig,e.richtingen]);
   });
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
-  toast(`${fmt(allFeatures.length)} locaties als CSV`);toggleDL();
+  toast(`${fmt(feats.length)} locaties als CSV`);toggleDL();
 }
 
 function exportGeoJSON(){
-  if(!allFeatures.length){toast('Geen data in beeld');return}
-  const fc={type:'FeatureCollection',features:allFeatures.map(f=>{
+  const feats=filteredFeatures();
+  if(!feats.length){toast('Geen data in beeld');return}
+  const fc={type:'FeatureCollection',features:feats.map(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    const e=enrichProps(p);
     return{type:'Feature',geometry:{type:'Point',coordinates:[lon,lat]},properties:{
       woonplaats:p.WOONPLAATSNAAM,gemeente:p.GEMEENTE,postcode:p.POSTCODE,
       installaties:p.AANTAL,technologie:p.HOOFDSOORT,
       '5g':p.VIJFG||0,'4g':p.VIERG||0,'3g':p.DRIEG||0,'2g':p.TWEEG||0,
-      small_cell:p.SMALL_CELL_INDICATOR||'Nee',ant_ids:p.ANT_IDS
+      small_cell:p.SMALL_CELL_INDICATOR||'Nee',
+      hoogte_m:e.hoogte||null,vermogen_dBW:e.vermogen||null,
+      veilige_afstand_m:e.veilig||null,richtingen:e.richtingen||null
     }};
   })};
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.geojson`,JSON.stringify(fc,null,2),'application/json');
-  toast(`${fmt(allFeatures.length)} locaties als GeoJSON`);toggleDL();
+  toast(`${fmt(feats.length)} locaties als GeoJSON`);toggleDL();
 }
 
 function exportKML(){
-  if(!allFeatures.length){toast('Geen data in beeld');return}
-  const placemarks=allFeatures.map(f=>{
+  const feats=filteredFeatures();
+  if(!feats.length){toast('Geen data in beeld');return}
+  const placemarks=feats.map(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    const e=enrichProps(p);
     const name=`${p.WOONPLAATSNAAM||p.GEMEENTE||'Antenne'} — ${p.HOOFDSOORT||''}`;
-    return`<Placemark><name>${name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</name><description>Gemeente: ${p.GEMEENTE||'—'}\nPostcode: ${p.POSTCODE||'—'}\nInstallaties: ${p.AANTAL||0}\n5G: ${p.VIJFG||0} | 4G: ${p.VIERG||0} | 3G: ${p.DRIEG||0} | 2G: ${p.TWEEG||0}</description><Point><coordinates>${lon},${lat},0</coordinates></Point></Placemark>`;
+    const desc=[`Gemeente: ${p.GEMEENTE||'—'}`,`Postcode: ${p.POSTCODE||'—'}`,`Installaties: ${p.AANTAL||0}`,`5G: ${p.VIJFG||0} | 4G: ${p.VIERG||0} | 3G: ${p.DRIEG||0} | 2G: ${p.TWEEG||0}`,e.hoogte?`Hoogte: ${e.hoogte}m`:'',e.vermogen?`Vermogen: ${e.vermogen} dBW`:'',e.richtingen?`Richtingen: ${e.richtingen.replace(/;/g,'° · ')}°`:''
+    ].filter(Boolean).join('\n');
+    return`<Placemark><name>${name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</name><description>${desc}</description><Point><coordinates>${lon},${lat},0</coordinates></Point></Placemark>`;
   }).join('\n');
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Antennekaart Export</name>\n${placemarks}\n</Document></kml>`;
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.kml`,kml,'application/vnd.google-earth.kml+xml');
-  toast(`${fmt(allFeatures.length)} locaties als KML`);toggleDL();
+  toast(`${fmt(feats.length)} locaties als KML`);toggleDL();
 }
 
 function downloadFull(type){
