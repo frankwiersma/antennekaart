@@ -323,8 +323,8 @@ let fetchController=null;
 async function loadAntennas(){
   const z=map.getZoom();
   updateHash();
-  document.getElementById('zoomHint').classList.toggle('show',z<10);
-  if(z<10){cluster.clearLayers();updateFilters({});return}
+  document.getElementById('zoomHint').classList.toggle('show',z<12);
+  if(z<12){cluster.clearLayers();updateFilters({});return}
 
   if(fetchController)fetchController.abort();
   fetchController=new AbortController();
