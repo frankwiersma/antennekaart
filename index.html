@@ -489,8 +489,10 @@ async function showDetail(p,lat,lon){
   if(p.ANT_IDS){
     try{
       const ids=p.ANT_IDS.split(',').map(s=>s.trim()).filter(Boolean);
-      const filter=ids.map(id=>`AI_ID=${id}`).join(' OR ');
-      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      // OGC XML FILTER (CQL_FILTER is silently ignored by this MapServer!)
+      const ogcClauses=ids.map(id=>`<PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>${id}</Literal></PropertyIsEqualTo>`).join('');
+      const ogcFilter=ids.length===1?`<Filter>${ogcClauses}</Filter>`:`<Filter><Or>${ogcClauses}</Or></Filter>`;
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&count=5000&FILTER=${encodeURIComponent(ogcFilter)}`);
       const data=await r.json();
       const groups=data.features||[];
       document.querySelector('.sec .badge').textContent=`${groups.length}`;
@@ -826,12 +828,13 @@ async function renderBeams(){
   const allIds=visible.flatMap(f=>(f.properties.ANT_IDS||'').split(',').map(s=>s.trim()).filter(Boolean));
   if(!allIds.length)return;
 
-  // Batch in chunks of 30
-  for(let i=0;i<allIds.length;i+=30){
-    const chunk=allIds.slice(i,i+30);
-    const filter=chunk.map(id=>`AI_ID=${id}`).join(' OR ');
+  // Batch in chunks of 25 using OGC FILTER (CQL_FILTER is silently ignored!)
+  for(let i=0;i<allIds.length;i+=25){
+    const chunk=allIds.slice(i,i+25);
+    const clauses=chunk.map(id=>`<PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>${id}</Literal></PropertyIsEqualTo>`).join('');
+    const ogcFilter=chunk.length===1?`<Filter>${clauses}</Filter>`:`<Filter><Or>${clauses}</Or></Filter>`;
     try{
-      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&count=5000&FILTER=${encodeURIComponent(ogcFilter)}`);
       const data=await r.json();
       const groups=data.features||[];
 

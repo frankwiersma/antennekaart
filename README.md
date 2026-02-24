@@ -113,11 +113,14 @@ curl "https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0\
 &request=GetFeature&typeName=ms:Antennes&outputFormat=application/json\
 &bbox=136000,455000,138000,457000"
 
-# Get antenna details by installation ID
+# Get antenna details by installation ID (⚠️ use OGC FILTER, not CQL_FILTER!)
 curl "https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0\
 &request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json\
-&CQL_FILTER=AI_ID=8945423867"
+&FILTER=<Filter><PropertyIsEqualTo><PropertyName>AI_ID</PropertyName>\
+<Literal>8945423867</Literal></PropertyIsEqualTo></Filter>"
 ```
+
+> ⚠️ **Critical: `CQL_FILTER` is silently ignored** by this MapServer instance. Always use OGC XML `FILTER` parameter instead. `CQL_FILTER=AI_ID=123` will return unfiltered results without any error.
 
 ### Available Layers
 
@@ -137,21 +140,28 @@ Antennes.ANT_IDS = "8945423867, 8945423868, 8945423869"
 Antennes_Groepen.AI_ID = 8945423867  8945423868  8945423869
 ```
 
-> ⚠️ **Coverage note:** ~37% of referenced `ANT_IDS` have no matching records in `Antennes_Groepen`. This is a server-side data gap, not a bug.
+> ⚠️ **Coverage note:** Blind pagination (`count` + `startindex`) only returns ~63% of `Antennes_Groepen` records. The remaining ~37% **do exist** but are only accessible via OGC FILTER queries by specific `AI_ID`. The included scraper handles this correctly.
 
-### Pagination
+### Pagination & Filtering Gotchas
 
-The WFS server returns max ~5,000 features per request. For bulk downloads, paginate:
+The WFS server has two important quirks:
+
+1. **`CQL_FILTER` is silently ignored.** The server accepts the parameter without error but returns unfiltered results. Always use OGC XML `FILTER` instead.
+
+2. **Blind pagination misses data.** Paginating through `Antennes_Groepen` without filters (`count=5000&startindex=X`) returns ~391k records covering only ~45k unique `AI_ID`s. The full dataset contains ~72k+ unique IDs. To get complete data, query by specific `AI_ID` using OGC FILTER.
 
 ```bash
-# Page 1
-curl "...&count=5000&startindex=0"
-# Page 2
-curl "...&count=5000&startindex=5000"
-# etc.
+# ❌ WRONG — CQL_FILTER is silently ignored
+curl "...&CQL_FILTER=AI_ID=123"  # Returns random unfiltered data!
+
+# ✅ CORRECT — OGC XML FILTER
+curl "...&FILTER=<Filter><PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>123</Literal></PropertyIsEqualTo></Filter>"
+
+# ✅ Multiple IDs with OR
+curl "...&FILTER=<Filter><Or><PropertyIsEqualTo>...</PropertyIsEqualTo><PropertyIsEqualTo>...</PropertyIsEqualTo></Or></Filter>"
 ```
 
-Or use the included scraper script (see below).
+The included scraper script handles all of this automatically.
 
 ## Scripts
 
