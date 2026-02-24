@@ -191,6 +191,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .near-item .near-dist{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--text2);flex-shrink:0}
 
 /* Dark mode */
+/* Antenna tooltip */
+.ant-tip-wrap{padding:0!important;background:none!important;border:none!important;box-shadow:none!important}
+.ant-tip-wrap::before{display:none!important}
+.ant-tip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:180px;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-family:'Inter',sans-serif}
+.ant-tip-name{font-size:13px;font-weight:700;line-height:1.2;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ant-tip-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
+.ant-tip-techs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.ant-tip-tech{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:.3px}
+.ant-tip-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center}
+.ant-tip-meta b{color:var(--text2);font-weight:600}
+
 .dark{--bg:#0f1117;--surface:#1a1d27;--surface2:#242833;--border:#2e3340;--text:#f0f2f5;--text2:#a0a8b8;--text3:#636b7e}
 .dark .leaflet-container{background:#0f1117!important}
 .dark .leaflet-control-attribution{background:rgba(15,17,23,.8)!important}
@@ -376,6 +387,23 @@ function icon(tech,n,selected){
     html:`<div style="width:${s}px;height:${s}px;background:${c}20;border:2px solid ${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 ${s<20?8:10}px 'JetBrains Mono',monospace;color:${c};box-shadow:0 0 6px ${c}30;cursor:pointer;${sel}">${n>1?n:''}</div>`});
 }
 
+// ═══ TOOLTIP ═══
+function tipHTML(p){
+  const name=p.WOONPLAATSNAAM||p.GEMEENTE||'Antenne-installatie';
+  const sub=[p.POSTCODE,p.GEMEENTE].filter(Boolean).join(' · ');
+  const techs=[];
+  if(p.VIJFG>0)techs.push(`<span class="ant-tip-tech tag g5">${p.VIJFG}× 5G</span>`);
+  if(p.VIERG>0)techs.push(`<span class="ant-tip-tech tag g4">${p.VIERG}× LTE</span>`);
+  if(p.DRIEG>0)techs.push(`<span class="ant-tip-tech tag g3">${p.DRIEG}× UMTS</span>`);
+  if(p.TWEEG>0)techs.push(`<span class="ant-tip-tech tag g2">${p.TWEEG}× GSM</span>`);
+  const hs=(p.HOOFDSOORT||'').toUpperCase();
+  if(hs.includes('VAST')||hs==='VV')techs.push(`<span class="ant-tip-tech tag gv">Straal</span>`);
+  const meta=[];
+  meta.push(`<b>${p.AANTAL||1}</b> installatie${(p.AANTAL||1)>1?'s':''}`);
+  if(p.SMALL_CELL_INDICATOR&&p.SMALL_CELL_INDICATOR!=='Nee')meta.push('📶 small cell');
+  return `<div class="ant-tip"><div class="ant-tip-name">${name}</div><div class="ant-tip-sub">${sub||'—'}</div>${techs.length?`<div class="ant-tip-techs">${techs.join('')}</div>`:''}<div class="ant-tip-meta">${meta.join(' · ')}</div></div>`;
+}
+
 // ═══ FETCH ═══
 let fetchController=null;
 async function loadAntennas(){
@@ -412,6 +440,7 @@ async function loadAntennas(){
       if(!active.has(t==='OTHER'?'OTHER':t))return;
       const m=L.marker([lat,lon],{icon:icon(t,p.AANTAL||1)});
       m._antenneProps=p;m._ll=[lat,lon];
+      m.bindTooltip(tipHTML(p),{className:'ant-tip-wrap',direction:'top',offset:[0,-12],opacity:1});
       m.on('click',()=>showDetail(p,lat,lon));
       m.on('mouseover',()=>showHoverBeams(p,lat,lon));
       m.on('mouseout',()=>{hoverTarget=null;hoverBeamLayer.clearLayers()});
