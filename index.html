@@ -335,7 +335,7 @@ async function loadAntennas(){
     const[x1,y1]=RD.fromWGS(sw.lat,sw.lng),[x2,y2]=RD.fromWGS(ne.lat,ne.lng);
     const bbox=`${Math.floor(x1)},${Math.floor(y1)},${Math.ceil(x2)},${Math.ceil(y2)}`;
     const count=z>=16?3000:z>=14?2000:z>=12?1200:800;
-    const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`,{signal:fetchController.signal});
+    const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`,{signal:fetchController.signal});
     const data=await r.json();
     const feats=data.features||[];
     allFeatures=feats;
@@ -429,7 +429,7 @@ async function showDetail(p,lat,lon){
     try{
       const ids=p.ANT_IDS.split(',').map(s=>s.trim()).filter(Boolean);
       const filter=ids.map(id=>`AI_ID=${id}`).join(' OR ');
-      const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
       const data=await r.json();
       const groups=data.features||[];
       document.querySelector('.sec .badge').textContent=`${groups.length}`;
