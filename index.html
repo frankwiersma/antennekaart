@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Antennekaart NL — Alle antenne-installaties in Nederland</title>
 <meta name="description" content="Interactieve kaart van alle 35.000+ antenne-installaties in Nederland. Data: Antenneregister (RDI).">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -24,39 +25,57 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .leaflet-control-attribution{background:rgba(255,255,255,.85)!important;color:var(--text3)!important;font-size:10px!important;backdrop-filter:blur(8px)}
 .leaflet-control-attribution a{color:var(--text2)!important}
 
-/* Cluster markers */
+/* Cluster */
 .marker-cluster{background:none!important}
-.marker-cluster div{width:36px;height:36px;margin:0!important;text-align:center;border-radius:50%;font:600 12px 'JetBrains Mono',monospace;line-height:36px;color:#fff}
-.marker-cluster-small div{background:var(--blue);box-shadow:0 0 12px rgba(37,99,235,.3)}
-.marker-cluster-medium div{background:var(--orange);box-shadow:0 0 12px rgba(217,119,6,.3)}
-.marker-cluster-large div{background:var(--red);box-shadow:0 0 12px rgba(220,38,38,.3)}
+.marker-cluster div{width:36px;height:36px;margin:0!important;text-align:center;border-radius:50%;font:600 11px 'JetBrains Mono',monospace;line-height:36px;color:#fff}
+.marker-cluster-small div{background:var(--blue);box-shadow:0 0 10px rgba(37,99,235,.25)}
+.marker-cluster-medium div{background:var(--orange);box-shadow:0 0 10px rgba(217,119,6,.25)}
+.marker-cluster-large div{background:var(--red);box-shadow:0 0 10px rgba(220,38,38,.25)}
+
+/* Highlight ring */
+.highlight-ring{border:3px solid var(--blue)!important;box-shadow:0 0 16px rgba(37,99,235,.4)!important;z-index:9999!important}
 
 /* Top bar */
-.top-bar{position:absolute;top:12px;left:12px;right:12px;z-index:1000;display:flex;gap:10px;align-items:center;pointer-events:none}
+.top-bar{position:absolute;top:12px;left:12px;right:12px;z-index:1000;display:flex;gap:8px;align-items:center;pointer-events:none}
 .top-bar>*{pointer-events:auto}
-.logo{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:-.3px;backdrop-filter:blur(12px);white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.logo{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:-.3px;backdrop-filter:blur(12px);white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;transition:all .15s}
+.logo:hover{background:var(--surface2)}
 .logo .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:blink 3s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
-.search-wrap{flex:1;max-width:400px;position:relative}
-.search-wrap input{width:100%;padding:10px 14px 10px 38px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px 'Inter',sans-serif;outline:none;backdrop-filter:blur(12px);transition:border-color .2s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+
+/* Search */
+.search-wrap{flex:1;max-width:420px;position:relative}
+.search-wrap input{width:100%;padding:10px 40px 10px 38px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px 'Inter',sans-serif;outline:none;backdrop-filter:blur(12px);transition:all .2s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .search-wrap input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 .search-wrap input::placeholder{color:var(--text3)}
-.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);width:16px;height:16px}
-.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;overflow:hidden;display:none;box-shadow:0 4px 16px rgba(0,0,0,.1);max-height:240px;overflow-y:auto}
+.search-wrap .icon-search{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);width:16px;height:16px}
+.search-wrap .icon-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:20px;height:20px;background:var(--surface2);border:none;border-radius:50%;cursor:pointer;color:var(--text3);font-size:12px;display:none;align-items:center;justify-content:center;line-height:1}
+.search-wrap .icon-clear.show{display:flex}
+.search-wrap .icon-clear:hover{background:var(--border);color:var(--text)}
+.search-wrap .kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:11px 'JetBrains Mono',monospace;color:var(--text3);background:var(--surface2);padding:2px 6px;border-radius:4px;border:1px solid var(--border);pointer-events:none}
+.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;overflow:hidden;display:none;box-shadow:0 4px 16px rgba(0,0,0,.1);max-height:320px;overflow-y:auto}
 .search-results.show{display:block}
-.sr-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sr-section{padding:6px 14px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-family:'JetBrains Mono',monospace;background:var(--surface2)}
+.sr-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;transition:background .1s}
 .sr-item:last-child{border:none}
-.sr-item:hover{background:var(--surface2)}
-.sr-item small{color:var(--text3);font-size:11px}
-.zoom-hint{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);display:none;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-.zoom-hint.show{display:flex}
+.sr-item:hover,.sr-item.active{background:var(--surface2)}
+.sr-item .sr-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sr-item .sr-icon.loc{background:rgba(37,99,235,.1)}
+.sr-item .sr-icon.ant{background:rgba(22,163,74,.1)}
+.sr-item .sr-icon.rec{background:rgba(148,163,184,.1)}
+.sr-item .sr-text{min-width:0}
+.sr-item .sr-title{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sr-item .sr-sub{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Stats button */
-.stats-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:all .15s}
-.stats-btn:hover{background:var(--surface2)}
+/* Right controls */
+.right-controls{position:absolute;top:60px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:6px}
+.ctrl-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:all .15s;color:var(--text2)}
+.ctrl-btn:hover{background:var(--surface2);color:var(--text)}
+.ctrl-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.ctrl-btn[title]:hover::after{content:attr(title);position:absolute;right:42px;background:var(--surface);border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-size:11px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.1);color:var(--text);font-family:'Inter',sans-serif}
 
 /* Filter chips */
-.filters{position:absolute;bottom:12px;left:12px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.filters{position:absolute;bottom:12px;left:12px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:calc(100vw - 150px)}
 .chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer;transition:all .15s;user-select:none;backdrop-filter:blur(12px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .chip:hover{background:var(--surface2)}
 .chip.off{opacity:.35}
@@ -64,16 +83,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .chip .count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)}
 .chip-total{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 
-/* Copy link */
-.copy-btn{position:absolute;bottom:12px;right:12px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);color:var(--text2);transition:all .15s}
-.copy-btn:hover{background:var(--surface2);color:var(--text)}
-.copy-btn.copied{background:var(--green);color:#fff;border-color:var(--green)}
+/* Bottom right */
+.bottom-right{position:absolute;bottom:12px;right:12px;z-index:1000;display:flex;gap:6px}
+.br-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);color:var(--text2);transition:all .15s}
+.br-btn:hover{background:var(--surface2);color:var(--text)}
+.br-btn.copied{background:var(--green);color:#fff;border-color:var(--green)}
 
 /* Loading */
 .loader{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--text2);display:none;align-items:center;gap:8px;backdrop-filter:blur(12px);box-shadow:0 1px 6px rgba(0,0,0,.08)}
 .loader.on{display:flex}
 .loader .sp{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Zoom hint */
+.zoom-hint{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:999;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);display:none;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.zoom-hint.show{display:flex}
 
 /* Detail panel */
 .panel{position:absolute;top:0;right:0;width:400px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:1001;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);overflow-y:auto;overflow-x:hidden;box-shadow:-4px 0 20px rgba(0,0,0,.08)}
@@ -82,9 +106,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .ph{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;z-index:1}
 .ph h2{font-size:15px;font-weight:700;line-height:1.3}
-.ph small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);display:block;margin-top:3px}
+.ph small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);display:block;margin-top:3px;cursor:pointer}
+.ph small:hover{color:var(--blue);text-decoration:underline}
 .ph-actions{display:flex;gap:6px;flex-shrink:0}
-.ph button{background:none;border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ph button{background:none;border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
 .ph button:hover{background:var(--surface2);color:var(--text)}
 .pb{padding:14px 16px}
 
@@ -115,46 +140,54 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .acard-specs .v{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
 .acard-specs .l{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
 
-/* Compass */
-.compass{width:40px;height:40px;position:relative;margin:0 auto 4px}
-.compass-ring{width:100%;height:100%;border:2px solid var(--border);border-radius:50%;position:relative}
-.compass-n{position:absolute;top:-2px;left:50%;transform:translateX(-50);font-size:7px;color:var(--text3);font-weight:600}
-.compass-needle{position:absolute;top:50%;left:50%;width:2px;height:16px;transform-origin:bottom center;background:var(--red);border-radius:1px}
-
 /* Stats panel */
-.stats-panel{position:absolute;top:12px;right:12px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;width:260px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none}
+.stats-panel{position:absolute;top:12px;right:12px;z-index:1002;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;width:280px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none}
 .stats-panel.show{display:block}
 .stats-panel h3{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .stats-panel .close{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px}
 .stats-panel .close:hover{color:var(--text)}
-.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
-.stat-row:last-child{border:none}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0}
 .stat-row .label{display:flex;align-items:center;gap:6px;font-size:12px}
 .stat-row .dot{width:8px;height:8px;border-radius:50%}
 .stat-row .val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
-.stat-bar{height:4px;background:var(--surface2);border-radius:2px;margin-top:4px;overflow:hidden}
+.stat-bar{height:4px;background:var(--surface2);border-radius:2px;margin-bottom:4px;overflow:hidden}
 .stat-bar div{height:100%;border-radius:2px;transition:width .4s}
+
+/* Toast */
+.toast{position:absolute;bottom:60px;left:50%;transform:translateX(-50%) translateY(20px);z-index:2000;background:var(--text);color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Geolocation pulse */
+.geo-pulse{width:16px;height:16px;background:rgba(37,99,235,.3);border:2px solid var(--blue);border-radius:50%;animation:pulse 2s ease-out infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,99,235,.4)}70%{box-shadow:0 0 0 12px rgba(37,99,235,0)}100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}}
 
 @media(max-width:768px){
   .panel{width:100vw}
-  .logo span{display:none}
+  .logo span.logo-text{display:none}
   .search-wrap{max-width:none}
   .stats-panel{left:12px;right:12px;width:auto;top:60px}
-  .stats-btn span{display:none}
+  .search-wrap .kbd{display:none}
+  .right-controls{top:56px}
 }
 </style>
 </head>
 <body>
 
 <div class="top-bar">
-  <div class="logo"><span class="dot"></span><span>📡 Antennekaart NL</span></div>
+  <div class="logo" onclick="map.setView([52.17,5.39],8)"><span class="dot"></span><span class="logo-text">📡 Antennekaart</span></div>
   <div class="search-wrap">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input id="search" type="text" placeholder="Zoek postcode, stad of adres..." autocomplete="off">
+    <svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input id="search" type="text" placeholder="Zoek postcode, stad, adres of gemeente..." autocomplete="off">
+    <button class="icon-clear" id="searchClear" onclick="clearSearch()">✕</button>
+    <span class="kbd" id="searchKbd">/</span>
     <div class="search-results" id="searchResults"></div>
   </div>
-  <div class="zoom-hint" id="zoomHint">📍 Zoom in om antennes te zien</div>
-  <div class="stats-btn" id="statsBtn" onclick="toggleStats()">📊 <span>Stats</span></div>
+</div>
+
+<div class="right-controls">
+  <div class="ctrl-btn" onclick="geolocate()" title="Mijn locatie">📍</div>
+  <div class="ctrl-btn" onclick="toggleStats()" title="Statistieken">📊</div>
+  <div class="ctrl-btn" id="measureBtn" onclick="toggleMeasure()" title="Afstand meten">📏</div>
 </div>
 
 <div class="stats-panel" id="statsPanel">
@@ -164,34 +197,54 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 </div>
 
 <div class="loader" id="loader"><div class="sp"></div>Laden...</div>
+<div class="zoom-hint" id="zoomHint">📍 Zoom in om antennes te zien</div>
 
 <div class="filters" id="filters"></div>
 
-<button class="copy-btn" id="copyBtn" onclick="copyLink()">🔗 Deel locatie</button>
+<div class="bottom-right">
+  <button class="br-btn" onclick="exportView()">📥 Export CSV</button>
+  <button class="br-btn" id="copyBtn" onclick="copyLink()">🔗 Deel</button>
+</div>
 
 <div id="map"></div>
 
 <div class="panel" id="panel">
   <div class="ph">
-    <div><h2 id="pTitle"></h2><small id="pSub"></small></div>
+    <div><h2 id="pTitle"></h2><small id="pSub" onclick="copyCoords()"></small></div>
     <div class="ph-actions">
-      <button onclick="openInMaps()" title="Open in Google Maps">🗺️</button>
+      <button onclick="openInMaps()" title="Google Maps">🗺️</button>
+      <button onclick="openStreetView()" title="Street View">🚶</button>
       <button onclick="closePanel()">✕</button>
     </div>
   </div>
   <div class="pb" id="pBody"></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
+// ═══ UTILS ═══
+function toast(msg,ms=2000){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),ms)}
+function fmt(n){return(n||0).toLocaleString('nl')}
+
+// ═══ STORAGE ═══
+const STORE_KEY='antennekaart';
+function loadState(){try{return JSON.parse(localStorage.getItem(STORE_KEY))||{}}catch{return{}}}
+function saveState(patch){const s={...loadState(),...patch};localStorage.setItem(STORE_KEY,JSON.stringify(s))}
+function getRecents(){return(loadState().recents||[]).slice(0,5)}
+function addRecent(name,lat,lon){const r=getRecents().filter(x=>x.name!==name);r.unshift({name,lat,lon,ts:Date.now()});saveState({recents:r.slice(0,8)})}
+function getSavedFilters(){return loadState().filters||null}
+function saveFilters(f){saveState({filters:[...f]})}
+
 // ═══ RD ↔ WGS84 ═══
 const RD={x0:155000.04,y0:463000.05,p0:52.15517440,l0:5.38720621,
 toWGS(x,y){const dx=(x-this.x0)*1e-5,dy=(y-this.y0)*1e-5;
 const Kp=[0,2,0,2,0,2,1,4,2,4,1],Kq=[1,0,2,1,3,2,0,0,3,1,1],
 Kv=[3235.65389,-32.58297,-.2475,-.84978,-.0655,-.01709,-.00738,.0053,-.00039,.00033,-.00012],
 Lp=[1,1,1,3,1,3,0,3,1,0,2,5],Lq=[0,1,2,0,3,1,1,2,4,2,0,0],
-Lv=[5260.52916,105.94684,2.45089,-.81885,.05594,-.05607,.01199,-.00256,.00128,.00022,-.00022,.00026];
+Lv=[5260.52916,105.94684,2.45089,-.81885,.05594,-.05607,.01199,-.00256,.00128,.00022,-.00026];
 let p=0,l=0;for(let i=0;i<Kv.length;i++)p+=Kv[i]*dx**Kp[i]*dy**Kq[i];
 for(let i=0;i<Lv.length;i++)l+=Lv[i]*dx**Lp[i]*dy**Lq[i];return[this.p0+p/3600,this.l0+l/3600]},
 fromWGS(lat,lon){const dp=.36*(lat-this.p0),dl=.36*(lon-this.l0);
@@ -216,91 +269,72 @@ function primaryTech(p){
   const h=(p.HOOFDSOORT||'').toUpperCase();
   if(h.includes('VAST')||h==='VV')return'VV';return'OTHER';
 }
-
-function satColor(s){
-  if(!s)return'#94a3b8';s=s.toUpperCase();
-  if(s.includes('5G'))return'#16a34a';if(s.includes('LTE'))return'#2563eb';
-  if(s.includes('UMTS'))return'#d97706';if(s.includes('GSM'))return'#dc2626';
-  if(s.includes('VV')||s.includes('VAST'))return'#7c3aed';return'#94a3b8';
-}
-
-function satCls(s){
-  if(!s)return'';s=s.toUpperCase();
-  if(s.includes('5G'))return'g5';if(s.includes('LTE'))return'g4';
-  if(s.includes('UMTS'))return'g3';if(s.includes('GSM'))return'g2';
-  if(s.includes('VV')||s.includes('VAST'))return'gv';return'';
-}
+function satColor(s){if(!s)return'#94a3b8';s=s.toUpperCase();if(s.includes('5G'))return'#16a34a';if(s.includes('LTE'))return'#2563eb';if(s.includes('UMTS'))return'#d97706';if(s.includes('GSM'))return'#dc2626';if(s.includes('VV')||s.includes('VAST'))return'#7c3aed';return'#94a3b8'}
+function satCls(s){if(!s)return'';s=s.toUpperCase();if(s.includes('5G'))return'g5';if(s.includes('LTE'))return'g4';if(s.includes('UMTS'))return'g3';if(s.includes('GSM'))return'g2';if(s.includes('VV')||s.includes('VAST'))return'gv';return''}
 
 // ═══ URL HASH ═══
 function parseHash(){
-  const h=location.hash.replace('#','');
-  if(!h)return null;
-  const m=h.match(/@([\d.]+),([\d.]+),(\d+)z/);
+  const h=location.hash.replace('#','');if(!h)return null;
+  const m=h.match(/@(-?[\d.]+),(-?[\d.]+),(\d+)z/);
   return m?{lat:+m[1],lon:+m[2],zoom:+m[3]}:null;
 }
-function updateHash(){
-  const c=map.getCenter(),z=map.getZoom();
-  history.replaceState(null,null,`#@${c.lat.toFixed(5)},${c.lng.toFixed(5)},${z}z`);
-}
+function updateHash(){const c=map.getCenter(),z=map.getZoom();history.replaceState(null,null,`#@${c.lat.toFixed(5)},${c.lng.toFixed(5)},${z}z`)}
 
 // ═══ MAP ═══
 const initPos=parseHash()||{lat:52.09,lon:5.12,zoom:13};
 const map=L.map('map',{center:[initPos.lat,initPos.lon],zoom:initPos.zoom,zoomControl:true});
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{
-  subdomains:'abcd',maxZoom:19,
-  attribution:'© <a href="https://osm.org/copyright">OSM</a> · <a href="https://carto.com">CARTO</a> · Data: <a href="https://antenneregister.nl">Antenneregister</a>'
-}).addTo(map);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{
-  subdomains:'abcd',maxZoom:19,pane:'shadowPane'
-}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,attribution:'© <a href="https://osm.org/copyright">OSM</a> · <a href="https://carto.com">CARTO</a> · <a href="https://antenneregister.nl">Antenneregister</a>'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19,pane:'shadowPane'}).addTo(map);
 
-// Marker clustering
 const cluster=L.markerClusterGroup({
-  maxClusterRadius:40,
-  spiderfyOnMaxZoom:true,
-  showCoverageOnHover:false,
-  zoomToBoundsOnClick:true,
-  disableClusteringAtZoom:16,
-  iconCreateFunction(c){
-    const n=c.getChildCount();
-    const size=n<20?'small':n<100?'medium':'large';
-    return L.divIcon({html:`<div>${n}</div>`,className:`marker-cluster marker-cluster-${size}`,iconSize:[36,36]});
-  }
+  maxClusterRadius:40,spiderfyOnMaxZoom:true,showCoverageOnHover:false,
+  zoomToBoundsOnClick:true,disableClusteringAtZoom:16,
+  iconCreateFunction(c){const n=c.getChildCount();const size=n<20?'small':n<100?'medium':'large';return L.divIcon({html:`<div>${n>999?(n/1000).toFixed(1)+'k':n}</div>`,className:`marker-cluster marker-cluster-${size}`,iconSize:[36,36]})}
 });
 map.addLayer(cluster);
 
-let active=new Set(['5G','4G','3G','2G','VV','OTHER']);
-let stats={total:0,'5G':0,'4G':0,'3G':0,'2G':0,'VV':0};
+// Restore filters
+const saved=getSavedFilters();
+let active=saved?new Set(saved):new Set(['5G','4G','3G','2G','VV','OTHER']);
+let viewStats={total:0,'5G':0,'4G':0,'3G':0,'2G':0,'VV':0};
 let loadTimer=null;
-let currentDetail=null; // for Google Maps link
-let allFeatures=[]; // for stats
+let currentDetail=null;
+let allFeatures=[];
+let geoMarker=null;
+let selectedMarker=null;
 
-function icon(tech,n){
+// Measure tool
+let measuring=false;
+let measurePoints=[];
+let measureLine=null;
+let measureMarkers=[];
+
+function icon(tech,n,selected){
   const c=TECHS[tech]?.color||'#94a3b8';
   const s=n>5?28:n>2?22:16;
+  const sel=selected?'outline:3px solid '+c+';outline-offset:2px;':'';
   return L.divIcon({className:'',iconSize:[s,s],iconAnchor:[s/2,s/2],
-    html:`<div style="width:${s}px;height:${s}px;background:${c}20;border:2px solid ${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 ${s<20?8:10}px 'JetBrains Mono',monospace;color:${c};box-shadow:0 0 6px ${c}30;cursor:pointer">${n>1?n:''}</div>`});
+    html:`<div style="width:${s}px;height:${s}px;background:${c}20;border:2px solid ${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 ${s<20?8:10}px 'JetBrains Mono',monospace;color:${c};box-shadow:0 0 6px ${c}30;cursor:pointer;${sel}">${n>1?n:''}</div>`});
 }
 
 // ═══ FETCH ═══
+let fetchController=null;
 async function loadAntennas(){
   const z=map.getZoom();
   updateHash();
   document.getElementById('zoomHint').classList.toggle('show',z<10);
   if(z<10){cluster.clearLayers();updateFilters({});return}
 
+  if(fetchController)fetchController.abort();
+  fetchController=new AbortController();
+
   document.getElementById('loader').classList.add('on');
   try{
     const b=map.getBounds(),sw=b.getSouthWest(),ne=b.getNorthEast();
     const[x1,y1]=RD.fromWGS(sw.lat,sw.lng),[x2,y2]=RD.fromWGS(ne.lat,ne.lng);
     const bbox=`${Math.floor(x1)},${Math.floor(y1)},${Math.ceil(x2)},${Math.ceil(y2)}`;
-
-    // Load more data at higher zooms
-    const count=z>=15?2000:z>=13?1200:800;
-    const url=z>=15
-      ?`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`
-      :`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`;
-    const r=await fetch(url);
+    const count=z>=16?3000:z>=14?2000:z>=12?1200:800;
+    const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`,{signal:fetchController.signal});
     const data=await r.json();
     const feats=data.features||[];
     allFeatures=feats;
@@ -312,39 +346,36 @@ async function loadAntennas(){
     feats.forEach(f=>{
       const p=f.properties,t=primaryTech(p);
       const[lat,lon]=RD.toWGS(p.X,p.Y);
+      f._ll=[lat,lon]; // cache
       if(p.VIJFG>0)s['5G']++;if(p.VIERG>0)s['4G']++;
       if(p.DRIEG>0)s['3G']++;if(p.TWEEG>0)s['2G']++;
       if((p.HOOFDSOORT||'').toUpperCase().includes('VAST'))s['VV']++;
-      const tk=t==='OTHER'?'OTHER':t;
-      if(!active.has(tk))return;
+      if(!active.has(t==='OTHER'?'OTHER':t))return;
       const m=L.marker([lat,lon],{icon:icon(t,p.AANTAL||1)});
+      m._antenneProps=p;m._ll=[lat,lon];
       m.on('click',()=>showDetail(p,lat,lon));
       markers.push(m);
     });
     cluster.addLayers(markers);
     updateFilters(s);
     updateStats(s);
-  }catch(e){console.error(e)}
+  }catch(e){if(e.name!=='AbortError')console.error(e)}
   finally{document.getElementById('loader').classList.remove('on')}
 }
 
-function scheduleLoad(){clearTimeout(loadTimer);loadTimer=setTimeout(loadAntennas,350)}
+function scheduleLoad(){clearTimeout(loadTimer);loadTimer=setTimeout(loadAntennas,300)}
 map.on('moveend',scheduleLoad);
 
 // ═══ FILTERS ═══
 function updateFilters(s){
-  stats=s;
+  viewStats=s;
   const el=document.getElementById('filters');
-  const items=[
-    {k:'5G',label:'5G',c:'#16a34a'},{k:'4G',label:'4G',c:'#2563eb'},
-    {k:'3G',label:'3G',c:'#d97706'},{k:'2G',label:'2G',c:'#dc2626'},
-    {k:'VV',label:'Straal',c:'#7c3aed'}
-  ];
-  el.innerHTML=`<div class="chip-total">${(s.total||0).toLocaleString('nl')} sites</div>`+
-    items.map(i=>`<div class="chip ${active.has(i.k)?'':'off'}" onclick="toggle('${i.k}')"><span class="cd" style="background:${i.c}"></span>${i.label}<span class="count">${(s[i.k]||0).toLocaleString('nl')}</span></div>`).join('');
+  const items=[{k:'5G',label:'5G',c:'#16a34a'},{k:'4G',label:'4G',c:'#2563eb'},{k:'3G',label:'3G',c:'#d97706'},{k:'2G',label:'2G',c:'#dc2626'},{k:'VV',label:'Straal',c:'#7c3aed'}];
+  el.innerHTML=`<div class="chip-total">${fmt(s.total)} sites</div>`+
+    items.map(i=>`<div class="chip ${active.has(i.k)?'':'off'}" onclick="toggle('${i.k}')"><span class="cd" style="background:${i.c}"></span>${i.label}<span class="count">${fmt(s[i.k])}</span></div>`).join('');
 }
 
-function toggle(k){if(active.has(k))active.delete(k);else active.add(k);loadAntennas()}
+function toggle(k){if(active.has(k))active.delete(k);else active.add(k);saveFilters(active);loadAntennas()}
 
 // ═══ STATS ═══
 function toggleStats(){document.getElementById('statsPanel').classList.toggle('show')}
@@ -352,47 +383,34 @@ function toggleStats(){document.getElementById('statsPanel').classList.toggle('s
 function updateStats(s){
   const el=document.getElementById('statsBody');
   if(!s.total){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px">Zoom in om data te laden</div>';return}
-  const items=[
-    {k:'5G',label:'5G NR',c:'#16a34a'},{k:'4G',label:'LTE',c:'#2563eb'},
-    {k:'3G',label:'UMTS',c:'#d97706'},{k:'2G',label:'GSM',c:'#dc2626'},
-    {k:'VV',label:'Straalverbinding',c:'#7c3aed'}
-  ];
+  const items=[{k:'5G',label:'5G NR',c:'#16a34a'},{k:'4G',label:'LTE',c:'#2563eb'},{k:'3G',label:'UMTS',c:'#d97706'},{k:'2G',label:'GSM',c:'#dc2626'},{k:'VV',label:'Straalverb.',c:'#7c3aed'}];
   const max=Math.max(...items.map(i=>s[i.k]||0),1);
-
-  // Count small cells
   const smallCells=allFeatures.filter(f=>f.properties.SMALL_CELL_INDICATOR&&f.properties.SMALL_CELL_INDICATOR!=='Nee').length;
-  // Count gemeenten
   const gemeenten=new Set(allFeatures.map(f=>f.properties.GEMEENTE).filter(Boolean)).size;
+  const postcodes=new Set(allFeatures.map(f=>f.properties.POSTCODE).filter(Boolean)).size;
 
   el.innerHTML=items.map(i=>{
-    const v=s[i.k]||0;
-    const pct=s.total?(v/s.total*100).toFixed(1):0;
-    return `<div class="stat-row">
-      <div class="label"><span class="dot" style="background:${i.c}"></span>${i.label}</div>
-      <div class="val">${v.toLocaleString('nl')} <span style="color:var(--text3);font-weight:400;font-size:10px">${pct}%</span></div>
-    </div>
+    const v=s[i.k]||0;const pct=s.total?(v/s.total*100).toFixed(0):0;
+    return `<div class="stat-row"><div class="label"><span class="dot" style="background:${i.c}"></span>${i.label}</div><div class="val">${fmt(v)} <span style="color:var(--text3);font-weight:400;font-size:10px">${pct}%</span></div></div>
     <div class="stat-bar"><div style="width:${v/max*100}%;background:${i.c}"></div></div>`;
-  }).join('')+`
-    <div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px">
-      <div>📍 ${s.total.toLocaleString('nl')} locaties in ${gemeenten} gemeenten</div>
-      ${smallCells?`<div>📶 ${smallCells} small cells</div>`:''}
-    </div>`;
+  }).join('')+`<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:2px">
+    <div>📍 ${fmt(s.total)} locaties · ${gemeenten} gemeenten · ${postcodes} postcodes</div>
+    ${smallCells?`<div>📶 ${smallCells} small cells</div>`:''}
+    <div style="margin-top:4px;font-size:10px;opacity:.7">Data: Antenneregister (RDI)</div></div>`;
 }
 
 // ═══ DETAIL ═══
 async function showDetail(p,lat,lon){
   currentDetail={lat,lon,props:p};
   const panel=document.getElementById('panel');
-  document.getElementById('pTitle').textContent=p.WOONPLAATSNAAM||p.GEMEENTE||'Onbekend';
+  const loc=p.WOONPLAATSNAAM||p.GEMEENTE||'Onbekend';
+  document.getElementById('pTitle').textContent=loc;
   document.getElementById('pSub').textContent=`${p.POSTCODE||'—'} · ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  document.title=`${loc} — Antennekaart NL`;
 
   const techs=(p.HOOFDSOORT||'').split(',').map(s=>s.trim()).filter(Boolean);
   const tags=techs.map(t=>`<span class="tag ${satCls(t)}">${t}</span>`).join('');
-
-  const techLine=[p.VIJFG>0?`<b style="color:#16a34a">${p.VIJFG}× 5G</b>`:'',
-    p.VIERG>0?`<b style="color:#2563eb">${p.VIERG}× 4G</b>`:'',
-    p.DRIEG>0?`<b style="color:#d97706">${p.DRIEG}× 3G</b>`:'',
-    p.TWEEG>0?`<b style="color:#dc2626">${p.TWEEG}× 2G</b>`:''].filter(Boolean).join(' · ');
+  const techLine=[p.VIJFG>0?`<b style="color:#16a34a">${p.VIJFG}× 5G</b>`:'',p.VIERG>0?`<b style="color:#2563eb">${p.VIERG}× 4G</b>`:'',p.DRIEG>0?`<b style="color:#d97706">${p.DRIEG}× 3G</b>`:'',p.TWEEG>0?`<b style="color:#dc2626">${p.TWEEG}× 2G</b>`:''].filter(Boolean).join(' · ');
 
   document.getElementById('pBody').innerHTML=`
     <div class="tags">${tags}</div>
@@ -404,7 +422,6 @@ async function showDetail(p,lat,lon){
     </div>
     <div class="sec">Antenne-installaties <span class="badge">laden...</span></div>
     <div id="groupsArea"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px"><div class="sp" style="margin:0 auto 6px;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite"></div>Detail laden...</div></div>`;
-
   panel.classList.add('open');
 
   if(p.ANT_IDS){
@@ -414,146 +431,261 @@ async function showDetail(p,lat,lon){
       const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
       const data=await r.json();
       const groups=data.features||[];
-
-      // Update badge
-      document.querySelector('.sec .badge').textContent=`${groups.length} records`;
+      document.querySelector('.sec .badge').textContent=`${groups.length}`;
 
       if(!groups.length){document.getElementById('groupsArea').innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:12px">Geen detail data beschikbaar</div>';return}
 
-      // Group by technology, then by AI_ID
       const byTech={};
-      groups.forEach(g=>{
-        const p=g.properties;
-        const tech=p.SAT_CODE||'Overig';
-        if(!byTech[tech])byTech[tech]=[];
-        byTech[tech].push(p);
-      });
-
-      // Sort techs: 5G first, then LTE, UMTS, GSM, rest
+      groups.forEach(g=>{const p=g.properties;const tech=p.SAT_CODE||'Overig';(byTech[tech]=byTech[tech]||[]).push(p)});
       const techOrder=['5G NR','LTE','UMTS','GSM','VV'];
-      const sorted=Object.entries(byTech).sort((a,b)=>{
-        const ai=techOrder.findIndex(t=>a[0].includes(t)),bi=techOrder.findIndex(t=>b[0].includes(t));
-        return (ai===-1?99:ai)-(bi===-1?99:bi);
-      });
+      const sorted=Object.entries(byTech).sort((a,b)=>{const ai=techOrder.findIndex(t=>a[0].includes(t)),bi=techOrder.findIndex(t=>b[0].includes(t));return(ai===-1?99:ai)-(bi===-1?99:bi)});
 
       let html='';
       sorted.forEach(([tech,entries])=>{
         const c=satColor(tech);
-        // Group entries by frequency
-        const byFreq={};
-        entries.forEach(e=>{
-          const k=e.FREQUENTIE||'—';
-          if(!byFreq[k])byFreq[k]=[];
-          byFreq[k].push(e);
-        });
+        const byFreq={};entries.forEach(e=>{const k=e.FREQUENTIE||'—';(byFreq[k]=byFreq[k]||[]).push(e)});
 
-        html+=`<div class="acard" style="border-left:3px solid ${c}">
-          <div class="acard-head">
-            <span class="acard-type" style="color:${c}">${tech}</span>
-            <span class="acard-freq">${entries.length} panel${entries.length>1?'s':''}</span>
-          </div>`;
+        html+=`<div class="acard" style="border-left:3px solid ${c}"><div class="acard-head"><span class="acard-type" style="color:${c}">${tech}</span><span class="acard-freq">${entries.length} panel${entries.length>1?'s':''}</span></div>`;
 
         Object.entries(byFreq).forEach(([freq,panels])=>{
-          const e=panels[0];
           const heights=[...new Set(panels.map(p=>p.HOOGTE).filter(h=>h!=null))];
           const powers=[...new Set(panels.map(p=>p.ZENDVERMOGEN).filter(v=>v!=null))];
           const dirs=panels.filter(p=>p.DIR_NONDIR==='D'&&p.HOOFDSTRAALRICHTING!=null).map(p=>p.HOOFDSTRAALRICHTING);
           const safeMax=Math.max(...panels.map(p=>p.VEILIGE_AFSTAND||0));
 
           html+=`<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:6px;color:var(--text2)">
-              <b>${freq}</b> ${panels.length>1?`· ${panels.length} sectoren`:''}
-            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:6px;color:var(--text2)"><b>${freq}</b>${panels.length>1?` · ${panels.length} sectoren`:''}</div>
             <div class="acard-specs">
               <div><div class="v">${heights.length?heights.join('/'):'—'} m</div><div class="l">Hoogte</div></div>
               <div><div class="v">${powers.length?powers.join('/'):'—'} dBW</div><div class="l">Vermogen</div></div>
               <div><div class="v">${safeMax>0?safeMax+' m':'—'}</div><div class="l">Veilig</div></div>
             </div>
-            ${dirs.length?`<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">Richtingen: ${dirs.sort((a,b)=>a-b).join('° · ')}°</div>`:''}
+            ${dirs.length?`<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">↗ ${dirs.sort((a,b)=>a-b).join('° · ')}°</div>`:''}
           </div>`;
         });
 
-        // Dates
         const dates=entries.map(e=>e.DATUM_INGEBRUIKNAME).filter(Boolean).sort();
-        if(dates.length){
-          html+=`<div style="font-size:10px;color:var(--text3)">In gebruik sinds ${dates[0]}</div>`;
-        }
+        if(dates.length)html+=`<div style="font-size:10px;color:var(--text3)">📅 In gebruik sinds ${dates[0]}</div>`;
         html+='</div>';
       });
       document.getElementById('groupsArea').innerHTML=html;
-    }catch(e){document.getElementById('groupsArea').innerHTML='<div style="color:var(--red);font-size:12px;text-align:center;padding:12px">Fout bij laden detail data</div>'}
+    }catch(e){document.getElementById('groupsArea').innerHTML='<div style="color:var(--red);font-size:12px;text-align:center;padding:12px">Fout bij laden</div>'}
   }
 }
 
-function closePanel(){document.getElementById('panel').classList.remove('open');currentDetail=null}
+function closePanel(){document.getElementById('panel').classList.remove('open');currentDetail=null;document.title='Antennekaart NL — Alle antenne-installaties in Nederland'}
+function openInMaps(){if(currentDetail)window.open(`https://www.google.com/maps?q=${currentDetail.lat},${currentDetail.lon}&z=18&layer=satellite`,'_blank')}
+function openStreetView(){if(currentDetail)window.open(`https://www.google.com/maps?cbll=${currentDetail.lat},${currentDetail.lon}&cbp=12,0,0,0,0&layer=c`,'_blank')}
+function copyCoords(){if(currentDetail){navigator.clipboard.writeText(`${currentDetail.lat.toFixed(6)}, ${currentDetail.lon.toFixed(6)}`);toast('Coördinaten gekopieerd')}}
 
-function openInMaps(){
-  if(!currentDetail)return;
-  window.open(`https://www.google.com/maps?q=${currentDetail.lat},${currentDetail.lon}&z=18&layer=satellite`,'_blank');
-}
-
-// ═══ SEARCH ═══
+// ═══ SEARCH (fuzzy) ═══
 const si=document.getElementById('search');
 const sr=document.getElementById('searchResults');
-let st;
+const searchClear=document.getElementById('searchClear');
+const searchKbd=document.getElementById('searchKbd');
+let searchTimer,searchIdx=-1;
 
+// Dutch postcode regex
+const PC_RE=/^(\d{4})\s*([a-zA-Z]{0,2})$/;
+
+si.addEventListener('focus',()=>{searchKbd.style.display='none';if(!si.value)showRecents()});
+si.addEventListener('blur',()=>{if(!si.value)searchKbd.style.display=''});
 si.addEventListener('input',()=>{
-  clearTimeout(st);
-  if(si.value.length<2){sr.classList.remove('show');return}
-  st=setTimeout(()=>doSearch(si.value),400);
+  searchClear.classList.toggle('show',si.value.length>0);
+  if(!si.value){showRecents();return}
+  clearTimeout(searchTimer);searchIdx=-1;
+  searchTimer=setTimeout(()=>doSearch(si.value),300);
 });
 
 si.addEventListener('keydown',e=>{
-  if(e.key==='Enter'){clearTimeout(st);doSearch(si.value,true)}
-  if(e.key==='Escape'){sr.classList.remove('show');si.blur()}
+  const items=sr.querySelectorAll('.sr-item[onclick]');
+  if(e.key==='ArrowDown'){e.preventDefault();searchIdx=Math.min(searchIdx+1,items.length-1);highlightItem(items)}
+  else if(e.key==='ArrowUp'){e.preventDefault();searchIdx=Math.max(searchIdx-1,-1);highlightItem(items)}
+  else if(e.key==='Enter'){
+    e.preventDefault();
+    if(searchIdx>=0&&items[searchIdx])items[searchIdx].click();
+    else{clearTimeout(searchTimer);doSearch(si.value,true)}
+  }
+  else if(e.key==='Escape'){sr.classList.remove('show');si.blur()}
 });
+
+function highlightItem(items){items.forEach((el,i)=>el.classList.toggle('active',i===searchIdx))}
+
+function clearSearch(){si.value='';searchClear.classList.remove('show');sr.classList.remove('show');si.focus()}
+
+function showRecents(){
+  const recents=getRecents();
+  if(!recents.length){sr.classList.remove('show');return}
+  sr.innerHTML=`<div class="sr-section">Recent</div>`+recents.map(r=>
+    `<div class="sr-item" onclick="goTo(${r.lat},${r.lon},'${r.name.replace(/'/g,"\\'")}')"><div class="sr-icon rec">🕐</div><div class="sr-text"><div class="sr-title">${r.name}</div></div></div>`
+  ).join('');
+  sr.classList.add('show');
+}
 
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))sr.classList.remove('show')});
 
 async function doSearch(q,navigate=false){
-  if(!q||q.length<2)return;
+  if(!q||q.length<1)return;
+
+  let results=[];
+
+  // 1. Search in loaded features first (fuzzy match on gemeente/woonplaats/postcode)
+  const ql=q.toLowerCase().trim();
+  const pcMatch=PC_RE.exec(ql);
+  const localMatches=[];
+
+  if(allFeatures.length){
+    const seen=new Set();
+    allFeatures.forEach(f=>{
+      const p=f.properties;
+      const pc=(p.POSTCODE||'').toLowerCase();
+      const city=(p.WOONPLAATSNAAM||'').toLowerCase();
+      const gem=(p.GEMEENTE||'').toLowerCase();
+      const key=`${p.POSTCODE}-${p.WOONPLAATSNAAM}`;
+
+      let score=0;
+      if(pcMatch&&pc.startsWith(pcMatch[1]))score=pcMatch[2]?pc.includes(pcMatch[2])?100:80:80;
+      else if(city===ql||gem===ql)score=90;
+      else if(city.startsWith(ql)||gem.startsWith(ql))score=70;
+      else if(city.includes(ql)||gem.includes(ql))score=50;
+
+      if(score>0&&!seen.has(key)){
+        seen.add(key);
+        const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+        localMatches.push({name:p.WOONPLAATSNAAM||p.GEMEENTE,sub:p.POSTCODE||'',lat,lon,score,isLocal:true});
+      }
+    });
+    localMatches.sort((a,b)=>b.score-a.score);
+  }
+
+  // 2. Nominatim geocoding
+  let geoResults=[];
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+' Nederland')}&limit=5&countrycodes=nl&addressdetails=1`);
-    const results=await r.json();
-    if(navigate&&results.length){
-      map.setView([+results[0].lat,+results[0].lon],15);
-      sr.classList.remove('show');
-      return;
-    }
-    if(!results.length){sr.innerHTML='<div class="sr-item" style="color:var(--text3)">Geen resultaten</div>';sr.classList.add('show');return}
-    sr.innerHTML=results.map((r,i)=>`<div class="sr-item" onclick="goTo(${r.lat},${r.lon})">
-      <span>📍</span><div><div>${r.display_name.split(',').slice(0,3).join(', ')}</div><small>${r.type||''}</small></div>
-    </div>`).join('');
-    sr.classList.add('show');
-  }catch(e){console.error(e)}
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+(q.match(/nederland|nl$/i)?'':' Nederland'))}&limit=5&countrycodes=nl&addressdetails=1`);
+    geoResults=(await r.json()).map(r=>({
+      name:r.display_name.split(',').slice(0,2).join(', '),
+      sub:r.display_name.split(',').slice(2,4).join(', ').trim(),
+      lat:+r.lat,lon:+r.lon,isLocal:false
+    }));
+  }catch(e){}
+
+  // Navigate immediately on enter
+  const all=[...localMatches.slice(0,3),...geoResults];
+  if(navigate&&all.length){
+    const best=all[0];
+    goTo(best.lat,best.lon,best.name);
+    return;
+  }
+
+  // Render results
+  let html='';
+  if(localMatches.length){
+    html+=`<div class="sr-section">Op de kaart (${fmt(allFeatures.length)} geladen)</div>`;
+    html+=localMatches.slice(0,4).map(r=>`<div class="sr-item" onclick="goTo(${r.lat},${r.lon},'${r.name.replace(/'/g,"\\'")}')"><div class="sr-icon ant">📡</div><div class="sr-text"><div class="sr-title">${r.name}</div><div class="sr-sub">${r.sub}</div></div></div>`).join('');
+  }
+  if(geoResults.length){
+    html+=`<div class="sr-section">Locaties</div>`;
+    html+=geoResults.map(r=>`<div class="sr-item" onclick="goTo(${r.lat},${r.lon},'${r.name.replace(/'/g,"\\'")}')"><div class="sr-icon loc">📍</div><div class="sr-text"><div class="sr-title">${r.name}</div><div class="sr-sub">${r.sub}</div></div></div>`).join('');
+  }
+  if(!html)html='<div class="sr-item" style="color:var(--text3);justify-content:center">Geen resultaten voor "${q}"</div>';
+
+  sr.innerHTML=html;sr.classList.add('show');searchIdx=-1;
 }
 
-function goTo(lat,lon){
+function goTo(lat,lon,name=''){
   map.setView([lat,lon],15);
-  sr.classList.remove('show');
-  si.blur();
+  sr.classList.remove('show');si.value=name;
+  searchClear.classList.toggle('show',!!name);
+  if(name)addRecent(name,lat,lon);
+}
+
+// ═══ GEOLOCATION ═══
+function geolocate(){
+  if(!navigator.geolocation){toast('Locatie niet beschikbaar');return}
+  toast('Locatie zoeken...');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat,longitude:lon,accuracy}=pos.coords;
+    map.setView([lat,lon],16);
+    if(geoMarker)map.removeLayer(geoMarker);
+    geoMarker=L.marker([lat,lon],{icon:L.divIcon({className:'',iconSize:[16,16],iconAnchor:[8,8],html:'<div class="geo-pulse"></div>'})}).addTo(map);
+    toast(`Locatie gevonden (±${Math.round(accuracy)}m)`);
+  },err=>{toast('Locatie niet beschikbaar: '+err.message)},{enableHighAccuracy:true,timeout:10000});
+}
+
+// ═══ MEASURE ═══
+function toggleMeasure(){
+  measuring=!measuring;
+  document.getElementById('measureBtn').classList.toggle('active',measuring);
+  if(measuring){
+    toast('Klik op de kaart om afstand te meten. Klik nogmaals op 📏 om te stoppen.');
+    map.getContainer().style.cursor='crosshair';
+    map.on('click',onMeasureClick);
+  }else{
+    clearMeasure();
+    map.getContainer().style.cursor='';
+    map.off('click',onMeasureClick);
+  }
+}
+
+function onMeasureClick(e){
+  measurePoints.push(e.latlng);
+  const m=L.circleMarker(e.latlng,{radius:5,color:'var(--blue)',fillColor:'var(--blue)',fillOpacity:1,weight:2}).addTo(map);
+  measureMarkers.push(m);
+  if(measurePoints.length>1){
+    if(measureLine)map.removeLayer(measureLine);
+    measureLine=L.polyline(measurePoints,{color:'#2563eb',weight:3,dashArray:'8,8'}).addTo(map);
+    let total=0;
+    for(let i=1;i<measurePoints.length;i++)total+=measurePoints[i-1].distanceTo(measurePoints[i]);
+    const label=total>1000?(total/1000).toFixed(2)+' km':Math.round(total)+' m';
+    toast(`Afstand: ${label}`);
+  }
+}
+
+function clearMeasure(){
+  measurePoints=[];
+  measureMarkers.forEach(m=>map.removeLayer(m));measureMarkers=[];
+  if(measureLine){map.removeLayer(measureLine);measureLine=null}
+}
+
+// ═══ EXPORT CSV ═══
+function exportView(){
+  if(!allFeatures.length){toast('Geen data om te exporteren');return}
+  const rows=[['Woonplaats','Gemeente','Postcode','Lat','Lon','5G','4G','3G','2G','Installaties','SmallCell','Technologie']];
+  allFeatures.forEach(f=>{
+    const p=f.properties;
+    const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
+    rows.push([p.WOONPLAATSNAAM||'',p.GEMEENTE||'',p.POSTCODE||'',lat.toFixed(6),lon.toFixed(6),p.VIJFG||0,p.VIERG||0,p.DRIEG||0,p.TWEEG||0,p.AANTAL||0,p.SMALL_CELL_INDICATOR||'Nee',p.HOOFDSOORT||'']);
+  });
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`antennekaart_export_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  URL.revokeObjectURL(url);
+  toast(`${fmt(allFeatures.length)} locaties geëxporteerd`);
 }
 
 // ═══ COPY LINK ═══
 function copyLink(){
-  const url=location.href;
-  navigator.clipboard.writeText(url).then(()=>{
-    const btn=document.getElementById('copyBtn');
-    btn.classList.add('copied');btn.innerHTML='✓ Gekopieerd!';
-    setTimeout(()=>{btn.classList.remove('copied');btn.innerHTML='🔗 Deel locatie'},2000);
+  navigator.clipboard.writeText(location.href).then(()=>{
+    const b=document.getElementById('copyBtn');b.classList.add('copied');b.innerHTML='✓ Gekopieerd!';
+    setTimeout(()=>{b.classList.remove('copied');b.innerHTML='🔗 Deel'},2000);
   });
 }
 
 // ═══ KEYBOARD ═══
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){closePanel();sr.classList.remove('show')}
-  if(e.key==='/'&&document.activeElement!==si){e.preventDefault();si.focus()}
-  if(e.key==='s'&&document.activeElement!==si){e.preventDefault();toggleStats()}
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='Escape'){closePanel();sr.classList.remove('show');if(measuring)toggleMeasure()}
+  if(e.key==='/'){e.preventDefault();si.focus()}
+  if(e.key==='s'){e.preventDefault();toggleStats()}
+  if(e.key==='m'){e.preventDefault();toggleMeasure()}
+  if(e.key==='l'){e.preventDefault();geolocate()}
+  if(e.key==='e'){e.preventDefault();exportView()}
 });
 
 // ═══ INIT ═══
 updateFilters({});
-setTimeout(loadAntennas,300);
+setTimeout(loadAntennas,200);
 </script>
 </body>
 </html>
