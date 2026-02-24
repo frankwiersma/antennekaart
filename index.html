@@ -194,16 +194,14 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 /* Antenna tooltip */
 .ant-tip-wrap{padding:0!important;background:none!important;border:none!important;box-shadow:none!important}
 .ant-tip-wrap::before{display:none!important}
-.ant-tip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:180px;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-family:'Inter',sans-serif}
+.ant-tip{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:140px;max-width:200px;box-shadow:0 4px 16px rgba(0,0,0,.12);font-family:'Inter',sans-serif}
 .ant-tip-name{font-size:13px;font-weight:700;line-height:1.2;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ant-tip-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:8px}
 .ant-tip-techs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
 .ant-tip-tech{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:.3px}
 .ant-tip-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center}
 .ant-tip-meta b{color:var(--text2);font-weight:600}
-.ant-tip-detail{margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--text2)}
-.ant-tip-detail .v{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text)}
-.ant-tip-detail .l{color:var(--text3);font-size:9px}
+.ant-tip-detail{margin-top:5px;padding-top:5px;border-top:1px solid var(--border);font:10px 'JetBrains Mono',monospace;color:var(--text2);line-height:1.6}
 
 .dark{--bg:#0f1117;--surface:#1a1d27;--surface2:#242833;--border:#2e3340;--text:#f0f2f5;--text2:#a0a8b8;--text3:#636b7e}
 .dark .leaflet-container{background:#0f1117!important}
@@ -443,7 +441,7 @@ async function loadAntennas(){
       if(!active.has(t==='OTHER'?'OTHER':t))return;
       const m=L.marker([lat,lon],{icon:icon(t,p.AANTAL||1)});
       m._antenneProps=p;m._ll=[lat,lon];
-      m.bindTooltip(tipHTML(p),{className:'ant-tip-wrap',direction:'top',offset:[0,-12],opacity:1});
+      m.bindTooltip(tipHTML(p),{className:'ant-tip-wrap',direction:'right',offset:[12,0],opacity:1});
       m.on('click',()=>showDetail(p,lat,lon));
       m.on('mouseover',()=>showHoverBeams(p,lat,lon,m));
       m.on('mouseout',()=>{hoverTarget=null;hoverBeamLayer.clearLayers()});
@@ -946,18 +944,17 @@ function enrichTooltip(marker,groups){
   const det=el.querySelector('.ant-tip-detail');
   if(!det||!groups.length)return;
 
-  const heights=[...new Set(groups.map(g=>g.properties.HOOGTE).filter(h=>h!=null))].sort((a,b)=>b-a);
-  const powers=[...new Set(groups.map(g=>g.properties.ZENDVERMOGEN).filter(v=>v!=null))].sort((a,b)=>b-a);
-  const freqs=[...new Set(groups.map(g=>g.properties.FREQUENTIE).filter(Boolean))].sort((a,b)=>a-b);
-  const dirs=groups.filter(g=>g.properties.DIR_NONDIR==='D'&&g.properties.HOOFDSTRAALRICHTING!=null).map(g=>g.properties.HOOFDSTRAALRICHTING).sort((a,b)=>a-b);
-  const safeMax=Math.max(...groups.map(g=>g.properties.VEILIGE_AFSTAND||0),0);
+  const maxH=Math.max(...groups.map(g=>g.properties.HOOGTE||0));
+  const maxP=Math.max(...groups.map(g=>g.properties.ZENDVERMOGEN||0));
+  const safeMax=Math.max(...groups.map(g=>g.properties.VEILIGE_AFSTAND||0));
+  const dirs=[...new Set(groups.filter(g=>g.properties.DIR_NONDIR==='D'&&g.properties.HOOFDSTRAALRICHTING!=null).map(g=>g.properties.HOOFDSTRAALRICHTING))].sort((a,b)=>a-b);
 
-  let html='';
-  if(heights.length)html+=`<div><span class="l">Hoogte</span><br><span class="v">${heights[0]}m</span></div>`;
-  if(powers.length)html+=`<div><span class="l">Vermogen</span><br><span class="v">${Math.max(...powers)} dBW</span></div>`;
-  if(freqs.length)html+=`<div><span class="l">Frequenties</span><br><span class="v">${freqs.length <= 3 ? freqs.join(', ') : freqs.length + '×'}</span></div>`;
-  if(safeMax>0)html+=`<div><span class="l">Veilig</span><br><span class="v">${safeMax}m</span></div>`;
-  if(dirs.length)html+=`<div style="grid-column:1/-1"><span class="l">Straalrichtingen</span><br><span class="v">↗ ${dirs.join('° · ')}°</span></div>`;
+  const parts=[];
+  if(maxH>0)parts.push(`${maxH}m hoog`);
+  if(maxP>0)parts.push(`${maxP} dBW`);
+  if(safeMax>0)parts.push(`⚠ ${safeMax}m`);
+  let html=parts.length?parts.join(' · '):'';
+  if(dirs.length)html+=(html?'<br>':'')+'↗ '+dirs.map(d=>d+'°').join(' · ');
 
   if(html){det.innerHTML=html;det.style.display=''}
 }
