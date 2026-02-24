@@ -351,6 +351,7 @@ const cluster=L.markerClusterGroup({
   iconCreateFunction(c){const n=c.getChildCount();const size=n<20?'small':n<100?'medium':'large';return L.divIcon({html:`<div>${n>999?(n/1000).toFixed(1)+'k':n}</div>`,className:`marker-cluster marker-cluster-${size}`,iconSize:[36,36]})}
 });
 map.addLayer(cluster);
+map.addLayer(hoverBeamLayer);
 
 // Restore filters
 const saved=getSavedFilters();
@@ -413,6 +414,8 @@ async function loadAntennas(){
       const m=L.marker([lat,lon],{icon:icon(t,p.AANTAL||1)});
       m._antenneProps=p;m._ll=[lat,lon];
       m.on('click',()=>showDetail(p,lat,lon));
+      m.on('mouseover',()=>showHoverBeams(p,lat,lon));
+      m.on('mouseout',()=>{hoverTarget=null;hoverBeamLayer.clearLayers()});
       markers.push(m);
     });
     if(!heatOn)cluster.addLayers(markers);
@@ -796,6 +799,9 @@ function renderRanges(){
 // ═══ BEAM DIRECTIONS ═══
 let beamOn=false;
 let beamLayer=L.layerGroup();
+let hoverBeamLayer=L.layerGroup();
+let hoverTarget=null;
+const beamCache={};
 
 function toggleBeams(){
   beamOn=!beamOn;
@@ -817,18 +823,22 @@ async function renderBeams(){
   const z=map.getZoom();
   if(z<14){toast('Zoom verder in voor straalrichtingen');return}
 
-  // Pick visible features (max 50 for performance)
   const bounds=map.getBounds();
   const visible=allFeatures.filter(f=>{
     const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
     return bounds.contains([lat,lon]);
   }).slice(0,50);
 
-  // Fetch antenna groups for visible features
   const allIds=visible.flatMap(f=>(f.properties.ANT_IDS||'').split(',').map(s=>s.trim()).filter(Boolean));
   if(!allIds.length)return;
 
-  // Batch in chunks of 25 using OGC FILTER (CQL_FILTER is silently ignored!)
+  const idToLL={};
+  visible.forEach(f=>{
+    const ids=(f.properties.ANT_IDS||'').split(',').map(s=>s.trim());
+    const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
+    ids.forEach(id=>{idToLL[id]=[lat,lon]});
+  });
+
   for(let i=0;i<allIds.length;i+=25){
     const chunk=allIds.slice(i,i+25);
     const clauses=chunk.map(id=>`<PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>${id}</Literal></PropertyIsEqualTo>`).join('');
@@ -838,45 +848,87 @@ async function renderBeams(){
       const data=await r.json();
       const groups=data.features||[];
 
-      // Find parent location for each AI_ID
-      const idToLL={};
-      visible.forEach(f=>{
-        const ids=(f.properties.ANT_IDS||'').split(',').map(s=>s.trim());
-        const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
-        ids.forEach(id=>{idToLL[id]=[lat,lon]});
+      // Cache per antenna for hover reuse
+      const byParent={};
+      groups.forEach(g=>{
+        const ll=idToLL[String(g.properties.AI_ID)];
+        if(!ll)return;
+        const key=`${ll[0]},${ll[1]}`;
+        (byParent[key]=byParent[key]||[]).push(g);
+      });
+      Object.entries(byParent).forEach(([key,grps])=>{
+        const[lat,lon]=key.split(',').map(Number);
+        drawBeamLines(beamLayer,grps,lat,lon,{weight:2,opacity:0.5,showLabel:false});
       });
 
-      groups.forEach(g=>{
-        const p=g.properties;
-        if(p.DIR_NONDIR!=='D'||p.HOOFDSTRAALRICHTING==null)return;
-        const ll=idToLL[String(p.AI_ID)];
-        if(!ll)return;
-
-        const angle=p.HOOFDSTRAALRICHTING;
-        const color=satColor(p.SAT_CODE);
-        const len=z>=16?0.003:z>=15?0.005:0.008; // length in degrees
-
-        const rad=(angle-90)*Math.PI/180;
-        const endLat=ll[0]+Math.sin(rad+Math.PI/2)*len;
-        const endLon=ll[1]+Math.cos(rad+Math.PI/2)*len/Math.cos(ll[0]*Math.PI/180);
-
-        const line=L.polyline([ll,[endLat,endLon]],{
-          color:color,weight:2,opacity:0.5,dashArray:'4,4',interactive:false
-        });
-        beamLayer.addLayer(line);
-
-        // Small arrow at the end
-        const arrowSize=len*0.2;
-        const a1Lat=endLat+Math.sin(rad+Math.PI/2+2.7)*arrowSize;
-        const a1Lon=endLon+Math.cos(rad+Math.PI/2+2.7)*arrowSize/Math.cos(ll[0]*Math.PI/180);
-        const a2Lat=endLat+Math.sin(rad+Math.PI/2-2.7)*arrowSize;
-        const a2Lon=endLon+Math.cos(rad+Math.PI/2-2.7)*arrowSize/Math.cos(ll[0]*Math.PI/180);
-        beamLayer.addLayer(L.polyline([[a1Lat,a1Lon],[endLat,endLon],[a2Lat,a2Lon]],{
-          color:color,weight:2,opacity:0.5,interactive:false
-        }));
+      // Also populate beamCache for hover
+      visible.forEach(f=>{
+        const p=f.properties;if(!p.ANT_IDS)return;
+        const cacheKey=p.ANT_IDS;
+        if(beamCache[cacheKey])return;
+        const fIds=new Set(p.ANT_IDS.split(',').map(s=>s.trim()));
+        beamCache[cacheKey]=groups.filter(g=>fIds.has(String(g.properties.AI_ID)));
       });
     }catch(e){console.error(e)}
   }
+}
+
+// ═══ HOVER BEAMS ═══
+function drawBeamLines(layer,groups,lat,lon,opts={}){
+  const z=map.getZoom();
+  const weight=opts.weight||2.5;
+  const opacity=opts.opacity||0.7;
+  const showLabel=opts.showLabel!==false;
+  groups.forEach(g=>{
+    const p=g.properties;
+    if(p.DIR_NONDIR!=='D'||p.HOOFDSTRAALRICHTING==null)return;
+    const angle=p.HOOFDSTRAALRICHTING;
+    const color=satColor(p.SAT_CODE);
+    const len=z>=16?.003:z>=15?.005:z>=14?.008:.012;
+    const rad=(angle-90)*Math.PI/180;
+    const cosLat=Math.cos(lat*Math.PI/180);
+    const endLat=lat+Math.sin(rad+Math.PI/2)*len;
+    const endLon=lon+Math.cos(rad+Math.PI/2)*len/cosLat;
+
+    layer.addLayer(L.polyline([[lat,lon],[endLat,endLon]],{color,weight,opacity,dashArray:'6,4',interactive:false}));
+
+    // Arrowhead
+    const as=len*.2;
+    const a1=[endLat+Math.sin(rad+Math.PI/2+2.7)*as,endLon+Math.cos(rad+Math.PI/2+2.7)*as/cosLat];
+    const a2=[endLat+Math.sin(rad+Math.PI/2-2.7)*as,endLon+Math.cos(rad+Math.PI/2-2.7)*as/cosLat];
+    layer.addLayer(L.polyline([a1,[endLat,endLon],a2],{color,weight,opacity,interactive:false}));
+
+    // Angle label
+    if(showLabel){
+      layer.addLayer(L.marker([endLat,endLon],{icon:L.divIcon({className:'',
+        html:`<div style="font:600 10px 'JetBrains Mono',monospace;color:${color};text-shadow:0 0 3px var(--surface),0 0 3px var(--surface),0 0 5px var(--surface);white-space:nowrap;pointer-events:none">${angle}°</div>`,
+        iconSize:[32,14],iconAnchor:[16,7]}),interactive:false}));
+    }
+  });
+}
+
+async function showHoverBeams(props,lat,lon){
+  const key=props.ANT_IDS||`${lat},${lon}`;
+  hoverTarget=key;
+  hoverBeamLayer.clearLayers();
+  if(!props.ANT_IDS)return;
+
+  // Use cache if available
+  if(beamCache[key]){
+    if(hoverTarget===key)drawBeamLines(hoverBeamLayer,beamCache[key],lat,lon);
+    return;
+  }
+
+  const ids=props.ANT_IDS.split(',').map(s=>s.trim()).filter(Boolean);
+  const clauses=ids.map(id=>`<PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>${id}</Literal></PropertyIsEqualTo>`).join('');
+  const ogcFilter=ids.length===1?`<Filter>${clauses}</Filter>`:`<Filter><Or>${clauses}</Or></Filter>`;
+  try{
+    const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&count=5000&FILTER=${encodeURIComponent(ogcFilter)}`);
+    const data=await r.json();
+    const groups=data.features||[];
+    beamCache[key]=groups;
+    if(hoverTarget===key)drawBeamLines(hoverBeamLayer,groups,lat,lon);
+  }catch(e){}
 }
 
 // ═══ DARK MODE ═══
