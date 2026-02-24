@@ -385,7 +385,7 @@ async function loadAntennas(){
       m.on('click',()=>showDetail(p,lat,lon));
       markers.push(m);
     });
-    cluster.addLayers(markers);
+    if(!heatOn)cluster.addLayers(markers);
     updateFilters(s);
     updateStats(s);
     if(heatOn)renderHeat();
@@ -638,10 +638,12 @@ function toggleHeat(){
   heatOn=!heatOn;
   document.getElementById('heatBtn').classList.toggle('active',heatOn);
   if(heatOn){
+    cluster.removeFrom(map);
     renderHeat();
     toast('Heatmap aan — dichtheid antenne-installaties');
   }else{
     if(heatLayer){map.removeLayer(heatLayer);heatLayer=null}
+    cluster.addTo(map);
     toast('Heatmap uit');
   }
 }
@@ -649,14 +651,39 @@ function toggleHeat(){
 function renderHeat(){
   if(!heatOn||!allFeatures.length)return;
   if(heatLayer){map.removeLayer(heatLayer);heatLayer=null}
+
+  // Scale intensity dramatically — single antennas barely visible, clusters glow
+  const counts=allFeatures.map(f=>f.properties.AANTAL||1);
+  const maxCount=Math.max(...counts,1);
+
   const points=allFeatures.map(f=>{
     const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
-    const intensity=f.properties.AANTAL||1;
-    return[lat,lon,Math.min(intensity*0.3,1)];
+    const n=f.properties.AANTAL||1;
+    // Exponential scaling for dramatic contrast
+    const intensity=Math.pow(n/maxCount,0.4);
+    return[lat,lon,Math.max(intensity,0.15)];
   });
+
+  const z=map.getZoom();
+  const radius=z>=16?35:z>=14?30:z>=13?25:20;
+
   heatLayer=L.heatLayer(points,{
-    radius:25,blur:20,maxZoom:17,
-    gradient:{0.1:'#2563eb20',0.3:'#2563eb',0.5:'#16a34a',0.7:'#d97706',0.9:'#dc2626',1:'#dc2626'}
+    radius:radius,
+    blur:radius*0.7,
+    maxZoom:18,
+    max:1.0,
+    minOpacity:0.25,
+    gradient:{
+      0.0:'rgba(0,0,40,0)',
+      0.15:'#1e3a5f',
+      0.3:'#2563eb',
+      0.45:'#06b6d4',
+      0.55:'#16a34a',
+      0.7:'#eab308',
+      0.85:'#ea580c',
+      0.95:'#dc2626',
+      1.0:'#fff'
+    }
   }).addTo(map);
 }
 
