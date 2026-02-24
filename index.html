@@ -3,8 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antennekaart NL</title>
+<title>Antennekaart NL — Alle antenne-installaties in Nederland</title>
+<meta name="description" content="Interactieve kaart van alle 35.000+ antenne-installaties in Nederland. Data: Antenneregister (RDI).">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -22,57 +24,78 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .leaflet-control-attribution{background:rgba(255,255,255,.85)!important;color:var(--text3)!important;font-size:10px!important;backdrop-filter:blur(8px)}
 .leaflet-control-attribution a{color:var(--text2)!important}
 
+/* Cluster markers */
+.marker-cluster{background:none!important}
+.marker-cluster div{width:36px;height:36px;margin:0!important;text-align:center;border-radius:50%;font:600 12px 'JetBrains Mono',monospace;line-height:36px;color:#fff}
+.marker-cluster-small div{background:var(--blue);box-shadow:0 0 12px rgba(37,99,235,.3)}
+.marker-cluster-medium div{background:var(--orange);box-shadow:0 0 12px rgba(217,119,6,.3)}
+.marker-cluster-large div{background:var(--red);box-shadow:0 0 12px rgba(220,38,38,.3)}
+
 /* Top bar */
 .top-bar{position:absolute;top:12px;left:12px;right:12px;z-index:1000;display:flex;gap:10px;align-items:center;pointer-events:none}
 .top-bar>*{pointer-events:auto}
-.logo{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:-.3px;backdrop-filter:blur(12px);white-space:nowrap}
+.logo{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;letter-spacing:-.3px;backdrop-filter:blur(12px);white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .logo .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:blink 3s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 .search-wrap{flex:1;max-width:400px;position:relative}
-.search-wrap input{width:100%;padding:10px 14px 10px 38px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px 'Inter',sans-serif;outline:none;backdrop-filter:blur(12px);transition:border-color .2s}
-.search-wrap input:focus{border-color:var(--blue)}
+.search-wrap input{width:100%;padding:10px 14px 10px 38px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font:14px 'Inter',sans-serif;outline:none;backdrop-filter:blur(12px);transition:border-color .2s;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.search-wrap input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
 .search-wrap input::placeholder{color:var(--text3)}
 .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);width:16px;height:16px}
-.zoom-hint{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);display:none;align-items:center;gap:6px}
+.search-results{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-top:6px;overflow:hidden;display:none;box-shadow:0 4px 16px rgba(0,0,0,.1);max-height:240px;overflow-y:auto}
+.search-results.show{display:block}
+.sr-item{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.sr-item:last-child{border:none}
+.sr-item:hover{background:var(--surface2)}
+.sr-item small{color:var(--text3);font-size:11px}
+.zoom-hint{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);display:none;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 .zoom-hint.show{display:flex}
 
+/* Stats button */
+.stats-btn{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:all .15s}
+.stats-btn:hover{background:var(--surface2)}
+
 /* Filter chips */
-.filters{position:absolute;bottom:12px;left:12px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap}
+.filters{position:absolute;bottom:12px;left:12px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .chip{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer;transition:all .15s;user-select:none;backdrop-filter:blur(12px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .chip:hover{background:var(--surface2)}
 .chip.off{opacity:.35}
 .chip .cd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .chip .count{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)}
-.chip-total{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);backdrop-filter:blur(12px)}
+.chip-total{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);backdrop-filter:blur(12px);box-shadow:0 1px 3px rgba(0,0,0,.06)}
+
+/* Copy link */
+.copy-btn{position:absolute;bottom:12px;right:12px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);color:var(--text2);transition:all .15s}
+.copy-btn:hover{background:var(--surface2);color:var(--text)}
+.copy-btn.copied{background:var(--green);color:#fff;border-color:var(--green)}
 
 /* Loading */
-.loader{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--text2);display:none;align-items:center;gap:8px;backdrop-filter:blur(12px)}
+.loader{position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:12px;color:var(--text2);display:none;align-items:center;gap:8px;backdrop-filter:blur(12px);box-shadow:0 1px 6px rgba(0,0,0,.08)}
 .loader.on{display:flex}
 .loader .sp{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
-.loader{box-shadow:0 1px 6px rgba(0,0,0,.08)}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Detail panel */
-.panel{position:absolute;top:0;right:0;width:380px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:1000;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);overflow-y:auto;overflow-x:hidden}
+.panel{position:absolute;top:0;right:0;width:400px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:1001;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);overflow-y:auto;overflow-x:hidden;box-shadow:-4px 0 20px rgba(0,0,0,.08)}
 .panel.open{transform:none}
 .panel::-webkit-scrollbar{width:5px}
 .panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.panel{box-shadow:-4px 0 20px rgba(0,0,0,.08)}
 .ph{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;justify-content:space-between;align-items:flex-start;z-index:1}
 .ph h2{font-size:15px;font-weight:700;line-height:1.3}
 .ph small{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);display:block;margin-top:3px}
-.ph button{background:none;border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ph-actions{display:flex;gap:6px;flex-shrink:0}
+.ph button{background:none;border:1px solid var(--border);color:var(--text2);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ph button:hover{background:var(--surface2);color:var(--text)}
 .pb{padding:14px 16px}
 
 /* Tags */
 .tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px}
 .tag{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;letter-spacing:.5px}
-.tag.g5{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
-.tag.g4{background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
-.tag.g3{background:rgba(245,158,11,.1);color:var(--orange);border:1px solid rgba(245,158,11,.2)}
-.tag.g2{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
-.tag.gv{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+.tag.g5{background:rgba(22,163,74,.1);color:var(--green);border:1px solid rgba(22,163,74,.2)}
+.tag.g4{background:rgba(37,99,235,.1);color:var(--blue);border:1px solid rgba(37,99,235,.2)}
+.tag.g3{background:rgba(217,119,6,.1);color:var(--orange);border:1px solid rgba(217,119,6,.2)}
+.tag.g2{background:rgba(220,38,38,.1);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.tag.gv{background:rgba(124,58,237,.1);color:var(--purple);border:1px solid rgba(124,58,237,.2)}
 
 /* Grid */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px}
@@ -82,16 +105,43 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .cell span{font-size:13px;font-weight:500}
 
 /* Antenna cards */
-.sec{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;font-family:'JetBrains Mono',monospace;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.sec{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;font-family:'JetBrains Mono',monospace;margin:16px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.sec .badge{background:var(--blue);color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;letter-spacing:0}
 .acard{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:6px}
 .acard-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .acard-type{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600}
-.acard-dir{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+.acard-freq{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
 .acard-specs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;text-align:center}
 .acard-specs .v{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
 .acard-specs .l{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
 
-@media(max-width:768px){.panel{width:100vw}.logo span{display:none}.search-wrap{max-width:none}}
+/* Compass */
+.compass{width:40px;height:40px;position:relative;margin:0 auto 4px}
+.compass-ring{width:100%;height:100%;border:2px solid var(--border);border-radius:50%;position:relative}
+.compass-n{position:absolute;top:-2px;left:50%;transform:translateX(-50);font-size:7px;color:var(--text3);font-weight:600}
+.compass-needle{position:absolute;top:50%;left:50%;width:2px;height:16px;transform-origin:bottom center;background:var(--red);border-radius:1px}
+
+/* Stats panel */
+.stats-panel{position:absolute;top:12px;right:12px;z-index:1000;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;width:260px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none}
+.stats-panel.show{display:block}
+.stats-panel h3{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.stats-panel .close{position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px}
+.stats-panel .close:hover{color:var(--text)}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border:none}
+.stat-row .label{display:flex;align-items:center;gap:6px;font-size:12px}
+.stat-row .dot{width:8px;height:8px;border-radius:50%}
+.stat-row .val{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
+.stat-bar{height:4px;background:var(--surface2);border-radius:2px;margin-top:4px;overflow:hidden}
+.stat-bar div{height:100%;border-radius:2px;transition:width .4s}
+
+@media(max-width:768px){
+  .panel{width:100vw}
+  .logo span{display:none}
+  .search-wrap{max-width:none}
+  .stats-panel{left:12px;right:12px;width:auto;top:60px}
+  .stats-btn span{display:none}
+}
 </style>
 </head>
 <body>
@@ -100,26 +150,40 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
   <div class="logo"><span class="dot"></span><span>📡 Antennekaart NL</span></div>
   <div class="search-wrap">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input id="search" type="text" placeholder="Zoek postcode of stad..." autocomplete="off">
+    <input id="search" type="text" placeholder="Zoek postcode, stad of adres..." autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
   </div>
   <div class="zoom-hint" id="zoomHint">📍 Zoom in om antennes te zien</div>
+  <div class="stats-btn" id="statsBtn" onclick="toggleStats()">📊 <span>Stats</span></div>
+</div>
+
+<div class="stats-panel" id="statsPanel">
+  <button class="close" onclick="toggleStats()">✕</button>
+  <h3>📊 In beeld</h3>
+  <div id="statsBody"></div>
 </div>
 
 <div class="loader" id="loader"><div class="sp"></div>Laden...</div>
 
 <div class="filters" id="filters"></div>
 
+<button class="copy-btn" id="copyBtn" onclick="copyLink()">🔗 Deel locatie</button>
+
 <div id="map"></div>
 
 <div class="panel" id="panel">
   <div class="ph">
     <div><h2 id="pTitle"></h2><small id="pSub"></small></div>
-    <button onclick="closePanel()">✕</button>
+    <div class="ph-actions">
+      <button onclick="openInMaps()" title="Open in Google Maps">🗺️</button>
+      <button onclick="closePanel()">✕</button>
+    </div>
   </div>
   <div class="pb" id="pBody"></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 // ═══ RD ↔ WGS84 ═══
 const RD={x0:155000.04,y0:463000.05,p0:52.15517440,l0:5.38720621,
@@ -139,11 +203,11 @@ let x=0,y=0;for(let i=0;i<Rv.length;i++)x+=Rv[i]*dp**Rp[i]*dl**Rq[i];
 for(let i=0;i<Sv.length;i++)y+=Sv[i]*dp**Sp[i]*dl**Sq[i];return[this.x0+x,this.y0+y]}};
 
 const TECHS={
-  '5G':{color:'#22c55e',cls:'g5'},
-  '4G':{color:'#3b82f6',cls:'g4'},
-  '3G':{color:'#f59e0b',cls:'g3'},
-  '2G':{color:'#ef4444',cls:'g2'},
-  'VV':{color:'#a855f7',cls:'gv'},
+  '5G':{color:'#16a34a',cls:'g5',label:'5G NR'},
+  '4G':{color:'#2563eb',cls:'g4',label:'LTE'},
+  '3G':{color:'#d97706',cls:'g3',label:'UMTS'},
+  '2G':{color:'#dc2626',cls:'g2',label:'GSM'},
+  'VV':{color:'#7c3aed',cls:'gv',label:'Straalverbinding'},
 };
 
 function primaryTech(p){
@@ -154,10 +218,10 @@ function primaryTech(p){
 }
 
 function satColor(s){
-  if(!s)return'#636b7e';s=s.toUpperCase();
-  if(s.includes('5G'))return'#22c55e';if(s.includes('LTE'))return'#3b82f6';
-  if(s.includes('UMTS'))return'#f59e0b';if(s.includes('GSM'))return'#ef4444';
-  if(s.includes('VV')||s.includes('VAST'))return'#a855f7';return'#636b7e';
+  if(!s)return'#94a3b8';s=s.toUpperCase();
+  if(s.includes('5G'))return'#16a34a';if(s.includes('LTE'))return'#2563eb';
+  if(s.includes('UMTS'))return'#d97706';if(s.includes('GSM'))return'#dc2626';
+  if(s.includes('VV')||s.includes('VAST'))return'#7c3aed';return'#94a3b8';
 }
 
 function satCls(s){
@@ -167,8 +231,21 @@ function satCls(s){
   if(s.includes('VV')||s.includes('VAST'))return'gv';return'';
 }
 
+// ═══ URL HASH ═══
+function parseHash(){
+  const h=location.hash.replace('#','');
+  if(!h)return null;
+  const m=h.match(/@([\d.]+),([\d.]+),(\d+)z/);
+  return m?{lat:+m[1],lon:+m[2],zoom:+m[3]}:null;
+}
+function updateHash(){
+  const c=map.getCenter(),z=map.getZoom();
+  history.replaceState(null,null,`#@${c.lat.toFixed(5)},${c.lng.toFixed(5)},${z}z`);
+}
+
 // ═══ MAP ═══
-const map=L.map('map',{center:[52.09,5.12],zoom:13,zoomControl:true});
+const initPos=parseHash()||{lat:52.09,lon:5.12,zoom:13};
+const map=L.map('map',{center:[initPos.lat,initPos.lon],zoom:initPos.zoom,zoomControl:true});
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{
   subdomains:'abcd',maxZoom:19,
   attribution:'© <a href="https://osm.org/copyright">OSM</a> · <a href="https://carto.com">CARTO</a> · Data: <a href="https://antenneregister.nl">Antenneregister</a>'
@@ -177,35 +254,60 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.
   subdomains:'abcd',maxZoom:19,pane:'shadowPane'
 }).addTo(map);
 
-const markers=L.layerGroup().addTo(map);
-let active=new Set(['5G','4G','3G','2G','VV','OTHER','ALL']);
+// Marker clustering
+const cluster=L.markerClusterGroup({
+  maxClusterRadius:40,
+  spiderfyOnMaxZoom:true,
+  showCoverageOnHover:false,
+  zoomToBoundsOnClick:true,
+  disableClusteringAtZoom:16,
+  iconCreateFunction(c){
+    const n=c.getChildCount();
+    const size=n<20?'small':n<100?'medium':'large';
+    return L.divIcon({html:`<div>${n}</div>`,className:`marker-cluster marker-cluster-${size}`,iconSize:[36,36]});
+  }
+});
+map.addLayer(cluster);
+
+let active=new Set(['5G','4G','3G','2G','VV','OTHER']);
 let stats={total:0,'5G':0,'4G':0,'3G':0,'2G':0,'VV':0};
 let loadTimer=null;
+let currentDetail=null; // for Google Maps link
+let allFeatures=[]; // for stats
 
 function icon(tech,n){
-  const c=TECHS[tech]?.color||'#636b7e';
-  const s=n>5?26:n>2?22:18;
+  const c=TECHS[tech]?.color||'#94a3b8';
+  const s=n>5?28:n>2?22:16;
   return L.divIcon({className:'',iconSize:[s,s],iconAnchor:[s/2,s/2],
-    html:`<div style="width:${s}px;height:${s}px;background:${c}18;border:2px solid ${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 ${s<22?9:10}px 'JetBrains Mono',monospace;color:${c};box-shadow:0 0 8px ${c}40;cursor:pointer">${n>1?n:''}</div>`});
+    html:`<div style="width:${s}px;height:${s}px;background:${c}20;border:2px solid ${c};border-radius:50%;display:flex;align-items:center;justify-content:center;font:600 ${s<20?8:10}px 'JetBrains Mono',monospace;color:${c};box-shadow:0 0 6px ${c}30;cursor:pointer">${n>1?n:''}</div>`});
 }
 
 // ═══ FETCH ═══
 async function loadAntennas(){
   const z=map.getZoom();
-  document.getElementById('zoomHint').classList.toggle('show',z<11);
-  if(z<11){markers.clearLayers();updateFilters({});return}
+  updateHash();
+  document.getElementById('zoomHint').classList.toggle('show',z<10);
+  if(z<10){cluster.clearLayers();updateFilters({});return}
 
   document.getElementById('loader').classList.add('on');
   try{
     const b=map.getBounds(),sw=b.getSouthWest(),ne=b.getNorthEast();
     const[x1,y1]=RD.fromWGS(sw.lat,sw.lng),[x2,y2]=RD.fromWGS(ne.lat,ne.lng);
     const bbox=`${Math.floor(x1)},${Math.floor(y1)},${Math.ceil(x2)},${Math.ceil(y2)}`;
-    const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=800`);
+
+    // Load more data at higher zooms
+    const count=z>=15?2000:z>=13?1200:800;
+    const url=z>=15
+      ?`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`
+      :`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes&outputFormat=application/json&bbox=${bbox}&count=${count}`;
+    const r=await fetch(url);
     const data=await r.json();
     const feats=data.features||[];
+    allFeatures=feats;
 
-    markers.clearLayers();
+    cluster.clearLayers();
     const s={total:feats.length,'5G':0,'4G':0,'3G':0,'2G':0,'VV':0};
+    const markers=[];
 
     feats.forEach(f=>{
       const p=f.properties,t=primaryTech(p);
@@ -217,33 +319,69 @@ async function loadAntennas(){
       if(!active.has(tk))return;
       const m=L.marker([lat,lon],{icon:icon(t,p.AANTAL||1)});
       m.on('click',()=>showDetail(p,lat,lon));
-      markers.addLayer(m);
+      markers.push(m);
     });
+    cluster.addLayers(markers);
     updateFilters(s);
+    updateStats(s);
   }catch(e){console.error(e)}
   finally{document.getElementById('loader').classList.remove('on')}
 }
 
 function scheduleLoad(){clearTimeout(loadTimer);loadTimer=setTimeout(loadAntennas,350)}
-map.on('moveend',scheduleLoad);map.on('zoomend',scheduleLoad);
+map.on('moveend',scheduleLoad);
 
 // ═══ FILTERS ═══
 function updateFilters(s){
   stats=s;
   const el=document.getElementById('filters');
   const items=[
-    {k:'5G',label:'5G',c:'#22c55e'},{k:'4G',label:'4G',c:'#3b82f6'},
-    {k:'3G',label:'3G',c:'#f59e0b'},{k:'2G',label:'2G',c:'#ef4444'},
-    {k:'VV',label:'Straal',c:'#a855f7'}
+    {k:'5G',label:'5G',c:'#16a34a'},{k:'4G',label:'4G',c:'#2563eb'},
+    {k:'3G',label:'3G',c:'#d97706'},{k:'2G',label:'2G',c:'#dc2626'},
+    {k:'VV',label:'Straal',c:'#7c3aed'}
   ];
-  el.innerHTML=`<div class="chip-total">${s.total||0} sites</div>`+
-    items.map(i=>`<div class="chip ${active.has(i.k)?'':'off'}" onclick="toggle('${i.k}')"><span class="cd" style="background:${i.c}"></span>${i.label}<span class="count">${s[i.k]||0}</span></div>`).join('');
+  el.innerHTML=`<div class="chip-total">${(s.total||0).toLocaleString('nl')} sites</div>`+
+    items.map(i=>`<div class="chip ${active.has(i.k)?'':'off'}" onclick="toggle('${i.k}')"><span class="cd" style="background:${i.c}"></span>${i.label}<span class="count">${(s[i.k]||0).toLocaleString('nl')}</span></div>`).join('');
 }
 
 function toggle(k){if(active.has(k))active.delete(k);else active.add(k);loadAntennas()}
 
+// ═══ STATS ═══
+function toggleStats(){document.getElementById('statsPanel').classList.toggle('show')}
+
+function updateStats(s){
+  const el=document.getElementById('statsBody');
+  if(!s.total){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px">Zoom in om data te laden</div>';return}
+  const items=[
+    {k:'5G',label:'5G NR',c:'#16a34a'},{k:'4G',label:'LTE',c:'#2563eb'},
+    {k:'3G',label:'UMTS',c:'#d97706'},{k:'2G',label:'GSM',c:'#dc2626'},
+    {k:'VV',label:'Straalverbinding',c:'#7c3aed'}
+  ];
+  const max=Math.max(...items.map(i=>s[i.k]||0),1);
+
+  // Count small cells
+  const smallCells=allFeatures.filter(f=>f.properties.SMALL_CELL_INDICATOR&&f.properties.SMALL_CELL_INDICATOR!=='Nee').length;
+  // Count gemeenten
+  const gemeenten=new Set(allFeatures.map(f=>f.properties.GEMEENTE).filter(Boolean)).size;
+
+  el.innerHTML=items.map(i=>{
+    const v=s[i.k]||0;
+    const pct=s.total?(v/s.total*100).toFixed(1):0;
+    return `<div class="stat-row">
+      <div class="label"><span class="dot" style="background:${i.c}"></span>${i.label}</div>
+      <div class="val">${v.toLocaleString('nl')} <span style="color:var(--text3);font-weight:400;font-size:10px">${pct}%</span></div>
+    </div>
+    <div class="stat-bar"><div style="width:${v/max*100}%;background:${i.c}"></div></div>`;
+  }).join('')+`
+    <div style="margin-top:12px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);display:flex;flex-direction:column;gap:3px">
+      <div>📍 ${s.total.toLocaleString('nl')} locaties in ${gemeenten} gemeenten</div>
+      ${smallCells?`<div>📶 ${smallCells} small cells</div>`:''}
+    </div>`;
+}
+
 // ═══ DETAIL ═══
 async function showDetail(p,lat,lon){
+  currentDetail={lat,lon,props:p};
   const panel=document.getElementById('panel');
   document.getElementById('pTitle').textContent=p.WOONPLAATSNAAM||p.GEMEENTE||'Onbekend';
   document.getElementById('pSub').textContent=`${p.POSTCODE||'—'} · ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
@@ -251,8 +389,10 @@ async function showDetail(p,lat,lon){
   const techs=(p.HOOFDSOORT||'').split(',').map(s=>s.trim()).filter(Boolean);
   const tags=techs.map(t=>`<span class="tag ${satCls(t)}">${t}</span>`).join('');
 
-  const techLine=[p.VIJFG>0?'<b style="color:#22c55e">5G</b>':'',p.VIERG>0?'<b style="color:#3b82f6">4G</b>':'',
-    p.DRIEG>0?'<b style="color:#f59e0b">3G</b>':'',p.TWEEG>0?'<b style="color:#ef4444">2G</b>':''].filter(Boolean).join(' · ');
+  const techLine=[p.VIJFG>0?`<b style="color:#16a34a">${p.VIJFG}× 5G</b>`:'',
+    p.VIERG>0?`<b style="color:#2563eb">${p.VIERG}× 4G</b>`:'',
+    p.DRIEG>0?`<b style="color:#d97706">${p.DRIEG}× 3G</b>`:'',
+    p.TWEEG>0?`<b style="color:#dc2626">${p.TWEEG}× 2G</b>`:''].filter(Boolean).join(' · ');
 
   document.getElementById('pBody').innerHTML=`
     <div class="tags">${tags}</div>
@@ -262,7 +402,7 @@ async function showDetail(p,lat,lon){
       <div class="cell"><label>Small Cell</label><span>${p.SMALL_CELL_INDICATOR||'Nee'}</span></div>
       <div class="cell"><label>Generaties</label><span>${techLine||'—'}</span></div>
     </div>
-    <div class="sec">Antenne-installaties</div>
+    <div class="sec">Antenne-installaties <span class="badge">laden...</span></div>
     <div id="groupsArea"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px"><div class="sp" style="margin:0 auto 6px;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite"></div>Detail laden...</div></div>`;
 
   panel.classList.add('open');
@@ -271,64 +411,147 @@ async function showDetail(p,lat,lon){
     try{
       const ids=p.ANT_IDS.split(',').map(s=>s.trim()).filter(Boolean);
       const filter=ids.map(id=>`AI_ID=${id}`).join(' OR ');
-      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      const r=await fetch(`/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
       const data=await r.json();
       const groups=data.features||[];
 
-      if(!groups.length){document.getElementById('groupsArea').innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:12px">Geen detail data</div>';return}
+      // Update badge
+      document.querySelector('.sec .badge').textContent=`${groups.length} records`;
 
-      const byAid={};groups.forEach(g=>{const a=g.properties.AI_ID;(byAid[a]=byAid[a]||[]).push(g.properties)});
+      if(!groups.length){document.getElementById('groupsArea').innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:12px">Geen detail data beschikbaar</div>';return}
+
+      // Group by technology, then by AI_ID
+      const byTech={};
+      groups.forEach(g=>{
+        const p=g.properties;
+        const tech=p.SAT_CODE||'Overig';
+        if(!byTech[tech])byTech[tech]=[];
+        byTech[tech].push(p);
+      });
+
+      // Sort techs: 5G first, then LTE, UMTS, GSM, rest
+      const techOrder=['5G NR','LTE','UMTS','GSM','VV'];
+      const sorted=Object.entries(byTech).sort((a,b)=>{
+        const ai=techOrder.findIndex(t=>a[0].includes(t)),bi=techOrder.findIndex(t=>b[0].includes(t));
+        return (ai===-1?99:ai)-(bi===-1?99:bi);
+      });
 
       let html='';
-      Object.entries(byAid).forEach(([aid,entries])=>{
-        const f=entries[0],c=satColor(f.SAT_CODE);
+      sorted.forEach(([tech,entries])=>{
+        const c=satColor(tech);
+        // Group entries by frequency
+        const byFreq={};
+        entries.forEach(e=>{
+          const k=e.FREQUENTIE||'—';
+          if(!byFreq[k])byFreq[k]=[];
+          byFreq[k].push(e);
+        });
+
         html+=`<div class="acard" style="border-left:3px solid ${c}">
           <div class="acard-head">
-            <span class="acard-type" style="color:${c}">${f.SAT_CODE||'Onbekend'}</span>
-            <span class="acard-dir">${f.DIR_NONDIR==='D'&&f.HOOFDSTRAALRICHTING!=null?f.HOOFDSTRAALRICHTING+'°':f.DIR_NONDIR==='N'?'Omni':''}</span>
+            <span class="acard-type" style="color:${c}">${tech}</span>
+            <span class="acard-freq">${entries.length} panel${entries.length>1?'s':''}</span>
           </div>`;
-        entries.forEach(e=>{
-          html+=`<div class="acard-specs" style="margin-bottom:4px">
-            <div><div class="v">${e.FREQUENTIE||'—'}</div><div class="l">Freq</div></div>
-            <div><div class="v">${e.ZENDVERMOGEN!=null?e.ZENDVERMOGEN+' dBW':'—'}</div><div class="l">Vermogen</div></div>
-            <div><div class="v">${e.HOOGTE!=null?e.HOOGTE+' m':'—'}</div><div class="l">Hoogte</div></div>
-          </div>
-          <div class="acard-specs">
-            <div><div class="v">${e.HOOFDSTRAALRICHTING!=null?e.HOOFDSTRAALRICHTING+'°':'—'}</div><div class="l">Richting</div></div>
-            <div><div class="v">${e.VEILIGE_AFSTAND!=null&&e.VEILIGE_AFSTAND>=0?e.VEILIGE_AFSTAND+' m':'—'}</div><div class="l">Veilig</div></div>
-            <div><div class="v" style="font-size:10px">${e.DATUM_INGEBRUIKNAME||'—'}</div><div class="l">In gebruik</div></div>
+
+        Object.entries(byFreq).forEach(([freq,panels])=>{
+          const e=panels[0];
+          const heights=[...new Set(panels.map(p=>p.HOOGTE).filter(h=>h!=null))];
+          const powers=[...new Set(panels.map(p=>p.ZENDVERMOGEN).filter(v=>v!=null))];
+          const dirs=panels.filter(p=>p.DIR_NONDIR==='D'&&p.HOOFDSTRAALRICHTING!=null).map(p=>p.HOOFDSTRAALRICHTING);
+          const safeMax=Math.max(...panels.map(p=>p.VEILIGE_AFSTAND||0));
+
+          html+=`<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;margin-bottom:6px;color:var(--text2)">
+              <b>${freq}</b> ${panels.length>1?`· ${panels.length} sectoren`:''}
+            </div>
+            <div class="acard-specs">
+              <div><div class="v">${heights.length?heights.join('/'):'—'} m</div><div class="l">Hoogte</div></div>
+              <div><div class="v">${powers.length?powers.join('/'):'—'} dBW</div><div class="l">Vermogen</div></div>
+              <div><div class="v">${safeMax>0?safeMax+' m':'—'}</div><div class="l">Veilig</div></div>
+            </div>
+            ${dirs.length?`<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">Richtingen: ${dirs.sort((a,b)=>a-b).join('° · ')}°</div>`:''}
           </div>`;
         });
+
+        // Dates
+        const dates=entries.map(e=>e.DATUM_INGEBRUIKNAME).filter(Boolean).sort();
+        if(dates.length){
+          html+=`<div style="font-size:10px;color:var(--text3)">In gebruik sinds ${dates[0]}</div>`;
+        }
         html+='</div>';
       });
       document.getElementById('groupsArea').innerHTML=html;
-    }catch(e){document.getElementById('groupsArea').innerHTML='<div style="color:var(--red);font-size:12px;text-align:center;padding:12px">Fout bij laden</div>'}
+    }catch(e){document.getElementById('groupsArea').innerHTML='<div style="color:var(--red);font-size:12px;text-align:center;padding:12px">Fout bij laden detail data</div>'}
   }
 }
 
-function closePanel(){document.getElementById('panel').classList.remove('open')}
+function closePanel(){document.getElementById('panel').classList.remove('open');currentDetail=null}
+
+function openInMaps(){
+  if(!currentDetail)return;
+  window.open(`https://www.google.com/maps?q=${currentDetail.lat},${currentDetail.lon}&z=18&layer=satellite`,'_blank');
+}
 
 // ═══ SEARCH ═══
 const si=document.getElementById('search');
+const sr=document.getElementById('searchResults');
 let st;
-si.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(st);doSearch(si.value)}});
-si.addEventListener('input',()=>{clearTimeout(st);st=setTimeout(()=>doSearch(si.value),600)});
 
-async function doSearch(q){
+si.addEventListener('input',()=>{
+  clearTimeout(st);
+  if(si.value.length<2){sr.classList.remove('show');return}
+  st=setTimeout(()=>doSearch(si.value),400);
+});
+
+si.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){clearTimeout(st);doSearch(si.value,true)}
+  if(e.key==='Escape'){sr.classList.remove('show');si.blur()}
+});
+
+document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))sr.classList.remove('show')});
+
+async function doSearch(q,navigate=false){
   if(!q||q.length<2)return;
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+' Nederland')}&limit=1&countrycodes=nl`);
-    const d=await r.json();
-    if(d.length)map.setView([+d[0].lat,+d[0].lon],15);
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q+' Nederland')}&limit=5&countrycodes=nl&addressdetails=1`);
+    const results=await r.json();
+    if(navigate&&results.length){
+      map.setView([+results[0].lat,+results[0].lon],15);
+      sr.classList.remove('show');
+      return;
+    }
+    if(!results.length){sr.innerHTML='<div class="sr-item" style="color:var(--text3)">Geen resultaten</div>';sr.classList.add('show');return}
+    sr.innerHTML=results.map((r,i)=>`<div class="sr-item" onclick="goTo(${r.lat},${r.lon})">
+      <span>📍</span><div><div>${r.display_name.split(',').slice(0,3).join(', ')}</div><small>${r.type||''}</small></div>
+    </div>`).join('');
+    sr.classList.add('show');
   }catch(e){console.error(e)}
 }
 
+function goTo(lat,lon){
+  map.setView([lat,lon],15);
+  sr.classList.remove('show');
+  si.blur();
+}
+
+// ═══ COPY LINK ═══
+function copyLink(){
+  const url=location.href;
+  navigator.clipboard.writeText(url).then(()=>{
+    const btn=document.getElementById('copyBtn');
+    btn.classList.add('copied');btn.innerHTML='✓ Gekopieerd!';
+    setTimeout(()=>{btn.classList.remove('copied');btn.innerHTML='🔗 Deel locatie'},2000);
+  });
+}
+
+// ═══ KEYBOARD ═══
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape')closePanel();
+  if(e.key==='Escape'){closePanel();sr.classList.remove('show')}
   if(e.key==='/'&&document.activeElement!==si){e.preventDefault();si.focus()}
+  if(e.key==='s'&&document.activeElement!==si){e.preventDefault();toggleStats()}
 });
 
-// Start centered on Utrecht
+// ═══ INIT ═══
 updateFilters({});
 setTimeout(loadAntennas,300);
 </script>
