@@ -201,6 +201,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .ant-tip-tech{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px;letter-spacing:.3px}
 .ant-tip-meta{font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center}
 .ant-tip-meta b{color:var(--text2);font-weight:600}
+.ant-tip-detail{margin-top:6px;padding-top:6px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:10px;color:var(--text2)}
+.ant-tip-detail .v{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--text)}
+.ant-tip-detail .l{color:var(--text3);font-size:9px}
 
 .dark{--bg:#0f1117;--surface:#1a1d27;--surface2:#242833;--border:#2e3340;--text:#f0f2f5;--text2:#a0a8b8;--text3:#636b7e}
 .dark .leaflet-container{background:#0f1117!important}
@@ -401,7 +404,7 @@ function tipHTML(p){
   const meta=[];
   meta.push(`<b>${p.AANTAL||1}</b> installatie${(p.AANTAL||1)>1?'s':''}`);
   if(p.SMALL_CELL_INDICATOR&&p.SMALL_CELL_INDICATOR!=='Nee')meta.push('📶 small cell');
-  return `<div class="ant-tip"><div class="ant-tip-name">${name}</div><div class="ant-tip-sub">${sub||'—'}</div>${techs.length?`<div class="ant-tip-techs">${techs.join('')}</div>`:''}<div class="ant-tip-meta">${meta.join(' · ')}</div></div>`;
+  return `<div class="ant-tip"><div class="ant-tip-name">${name}</div><div class="ant-tip-sub">${sub||'—'}</div>${techs.length?`<div class="ant-tip-techs">${techs.join('')}</div>`:''}<div class="ant-tip-meta">${meta.join(' · ')}</div><div class="ant-tip-detail" style="display:none"></div></div>`;
 }
 
 // ═══ FETCH ═══
@@ -442,7 +445,7 @@ async function loadAntennas(){
       m._antenneProps=p;m._ll=[lat,lon];
       m.bindTooltip(tipHTML(p),{className:'ant-tip-wrap',direction:'top',offset:[0,-12],opacity:1});
       m.on('click',()=>showDetail(p,lat,lon));
-      m.on('mouseover',()=>showHoverBeams(p,lat,lon));
+      m.on('mouseover',()=>showHoverBeams(p,lat,lon,m));
       m.on('mouseout',()=>{hoverTarget=null;hoverBeamLayer.clearLayers()});
       markers.push(m);
     });
@@ -935,7 +938,31 @@ function drawBeamLines(layer,groups,lat,lon,opts={}){
   });
 }
 
-async function showHoverBeams(props,lat,lon){
+function enrichTooltip(marker,groups){
+  const tip=marker.getTooltip();
+  if(!tip)return;
+  const el=tip.getElement();
+  if(!el)return;
+  const det=el.querySelector('.ant-tip-detail');
+  if(!det||!groups.length)return;
+
+  const heights=[...new Set(groups.map(g=>g.properties.HOOGTE).filter(h=>h!=null))].sort((a,b)=>b-a);
+  const powers=[...new Set(groups.map(g=>g.properties.ZENDVERMOGEN).filter(v=>v!=null))].sort((a,b)=>b-a);
+  const freqs=[...new Set(groups.map(g=>g.properties.FREQUENTIE).filter(Boolean))].sort((a,b)=>a-b);
+  const dirs=groups.filter(g=>g.properties.DIR_NONDIR==='D'&&g.properties.HOOFDSTRAALRICHTING!=null).map(g=>g.properties.HOOFDSTRAALRICHTING).sort((a,b)=>a-b);
+  const safeMax=Math.max(...groups.map(g=>g.properties.VEILIGE_AFSTAND||0),0);
+
+  let html='';
+  if(heights.length)html+=`<div><span class="l">Hoogte</span><br><span class="v">${heights[0]}m</span></div>`;
+  if(powers.length)html+=`<div><span class="l">Vermogen</span><br><span class="v">${Math.max(...powers)} dBW</span></div>`;
+  if(freqs.length)html+=`<div><span class="l">Frequenties</span><br><span class="v">${freqs.length <= 3 ? freqs.join(', ') : freqs.length + '×'}</span></div>`;
+  if(safeMax>0)html+=`<div><span class="l">Veilig</span><br><span class="v">${safeMax}m</span></div>`;
+  if(dirs.length)html+=`<div style="grid-column:1/-1"><span class="l">Straalrichtingen</span><br><span class="v">↗ ${dirs.join('° · ')}°</span></div>`;
+
+  if(html){det.innerHTML=html;det.style.display=''}
+}
+
+async function showHoverBeams(props,lat,lon,marker){
   const key=props.ANT_IDS||`${lat},${lon}`;
   hoverTarget=key;
   hoverBeamLayer.clearLayers();
@@ -943,7 +970,10 @@ async function showHoverBeams(props,lat,lon){
 
   // Use cache if available
   if(beamCache[key]){
-    if(hoverTarget===key)drawBeamLines(hoverBeamLayer,beamCache[key],lat,lon);
+    if(hoverTarget===key){
+      drawBeamLines(hoverBeamLayer,beamCache[key],lat,lon);
+      if(marker)enrichTooltip(marker,beamCache[key]);
+    }
     return;
   }
 
@@ -955,7 +985,10 @@ async function showHoverBeams(props,lat,lon){
     const data=await r.json();
     const groups=data.features||[];
     beamCache[key]=groups;
-    if(hoverTarget===key)drawBeamLines(hoverBeamLayer,groups,lat,lon);
+    if(hoverTarget===key){
+      drawBeamLines(hoverBeamLayer,groups,lat,lon);
+      if(marker)enrichTooltip(marker,groups);
+    }
   }catch(e){}
 }
 
