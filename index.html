@@ -1112,8 +1112,49 @@ function dlFile(name,content,type='text/plain'){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
 }
 
-function filteredFeatures(){
-  return allFeatures.filter(f=>{const t=primaryTech(f.properties);return active.has(t==='OTHER'?'OTHER':t)});
+async function fetchAllGroups(){
+  // Collect all ANT_IDS not yet cached
+  const missing=[];
+  allFeatures.forEach(f=>{
+    const key=f.properties.ANT_IDS;
+    if(!key||beamCache[key])return;
+    missing.push(f);
+  });
+  if(!missing.length)return;
+
+  toast(`Detail ophalen voor ${missing.length} locaties...`,5000);
+  const allIds=[];
+  const idToKey={};
+  missing.forEach(f=>{
+    const key=f.properties.ANT_IDS;
+    const ids=key.split(',').map(s=>s.trim()).filter(Boolean);
+    ids.forEach(id=>{allIds.push(id);idToKey[id]=key});
+  });
+
+  // Deduplicate IDs
+  const uniqueIds=[...new Set(allIds)];
+
+  // Batch fetch in chunks of 50
+  for(let i=0;i<uniqueIds.length;i+=50){
+    const chunk=uniqueIds.slice(i,i+50);
+    const clauses=chunk.map(id=>`<PropertyIsEqualTo><PropertyName>AI_ID</PropertyName><Literal>${id}</Literal></PropertyIsEqualTo>`).join('');
+    const ogcFilter=chunk.length===1?`<Filter>${clauses}</Filter>`:`<Filter><Or>${clauses}</Or></Filter>`;
+    try{
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&count=5000&FILTER=${encodeURIComponent(ogcFilter)}`);
+      const data=await r.json();
+      const groups=data.features||[];
+      // Distribute into beamCache per antenna
+      missing.forEach(f=>{
+        const key=f.properties.ANT_IDS;
+        if(beamCache[key])return;
+        const fIds=new Set(key.split(',').map(s=>s.trim()));
+        const matched=groups.filter(g=>fIds.has(String(g.properties.AI_ID)));
+        if(matched.length)beamCache[key]=matched;
+      });
+    }catch(e){console.error(e)}
+  }
+  // Mark empties so we don't re-fetch
+  missing.forEach(f=>{const k=f.properties.ANT_IDS;if(!beamCache[k])beamCache[k]=[]});
 }
 
 function enrichProps(p){
@@ -1127,23 +1168,23 @@ function enrichProps(p){
   return{hoogte:maxH||'',vermogen:maxP||'',veilig:safeMax||'',richtingen:dirs.length?dirs.join(';'):''};
 }
 
-function exportCSV(){
-  const feats=filteredFeatures();
-  if(!feats.length){toast('Geen data in beeld');return}
+async function exportCSV(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
+  await fetchAllGroups();
   const rows=[['Woonplaats','Gemeente','Postcode','Lat','Lon','5G','4G','3G','2G','Installaties','SmallCell','Technologie','Hoogte_m','Vermogen_dBW','Veilig_m','Richtingen']];
-  feats.forEach(f=>{
+  allFeatures.forEach(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
     const e=enrichProps(p);
     rows.push([p.WOONPLAATSNAAM||'',p.GEMEENTE||'',p.POSTCODE||'',lat.toFixed(6),lon.toFixed(6),p.VIJFG||0,p.VIERG||0,p.DRIEG||0,p.TWEEG||0,p.AANTAL||0,p.SMALL_CELL_INDICATOR||'Nee',p.HOOFDSOORT||'',e.hoogte,e.vermogen,e.veilig,e.richtingen]);
   });
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.csv`,rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n'),'text/csv');
-  toast(`${fmt(feats.length)} locaties als CSV`);toggleDL();
+  toast(`${fmt(allFeatures.length)} locaties als CSV`);toggleDL();
 }
 
-function exportGeoJSON(){
-  const feats=filteredFeatures();
-  if(!feats.length){toast('Geen data in beeld');return}
-  const fc={type:'FeatureCollection',features:feats.map(f=>{
+async function exportGeoJSON(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
+  await fetchAllGroups();
+  const fc={type:'FeatureCollection',features:allFeatures.map(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
     const e=enrichProps(p);
     return{type:'Feature',geometry:{type:'Point',coordinates:[lon,lat]},properties:{
@@ -1156,13 +1197,13 @@ function exportGeoJSON(){
     }};
   })};
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.geojson`,JSON.stringify(fc,null,2),'application/json');
-  toast(`${fmt(feats.length)} locaties als GeoJSON`);toggleDL();
+  toast(`${fmt(allFeatures.length)} locaties als GeoJSON`);toggleDL();
 }
 
-function exportKML(){
-  const feats=filteredFeatures();
-  if(!feats.length){toast('Geen data in beeld');return}
-  const placemarks=feats.map(f=>{
+async function exportKML(){
+  if(!allFeatures.length){toast('Geen data in beeld');return}
+  await fetchAllGroups();
+  const placemarks=allFeatures.map(f=>{
     const p=f.properties;const[lat,lon]=f._ll||RD.toWGS(p.X,p.Y);
     const e=enrichProps(p);
     const name=`${p.WOONPLAATSNAAM||p.GEMEENTE||'Antenne'} — ${p.HOOFDSOORT||''}`;
@@ -1172,7 +1213,7 @@ function exportKML(){
   }).join('\n');
   const kml=`<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Antennekaart Export</name>\n${placemarks}\n</Document></kml>`;
   dlFile(`antennekaart_${new Date().toISOString().slice(0,10)}.kml`,kml,'application/vnd.google-earth.kml+xml');
-  toast(`${fmt(feats.length)} locaties als KML`);toggleDL();
+  toast(`${fmt(allFeatures.length)} locaties als KML`);toggleDL();
 }
 
 function downloadFull(type){
