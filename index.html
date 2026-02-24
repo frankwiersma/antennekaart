@@ -351,7 +351,6 @@ const cluster=L.markerClusterGroup({
   iconCreateFunction(c){const n=c.getChildCount();const size=n<20?'small':n<100?'medium':'large';return L.divIcon({html:`<div>${n>999?(n/1000).toFixed(1)+'k':n}</div>`,className:`marker-cluster marker-cluster-${size}`,iconSize:[36,36]})}
 });
 map.addLayer(cluster);
-map.addLayer(hoverBeamLayer);
 
 // Restore filters
 const saved=getSavedFilters();
@@ -799,7 +798,7 @@ function renderRanges(){
 // ═══ BEAM DIRECTIONS ═══
 let beamOn=false;
 let beamLayer=L.layerGroup();
-let hoverBeamLayer=L.layerGroup();
+let hoverBeamLayer=L.layerGroup().addTo(map);
 let hoverTarget=null;
 const beamCache={};
 
