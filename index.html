@@ -176,6 +176,28 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
 .geo-pulse{width:16px;height:16px;background:rgba(37,99,235,.3);border:2px solid var(--blue);border-radius:50%;animation:pulse 2s ease-out infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(37,99,235,.4)}70%{box-shadow:0 0 0 12px rgba(37,99,235,0)}100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}}
 
+/* Nearest panel */
+.nearest-panel{position:absolute;bottom:50px;left:12px;z-index:1001;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;width:320px;box-shadow:0 4px 16px rgba(0,0,0,.1);display:none;max-height:300px;overflow-y:auto}
+.nearest-panel.show{display:block}
+.nearest-panel h4{font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.nearest-panel .close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px}
+.near-item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;transition:background .1s;border-bottom:1px solid var(--border)}
+.near-item:last-child{border:none}
+.near-item:hover{background:var(--surface2)}
+.near-item .near-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.near-item .near-info{flex:1;min-width:0}
+.near-item .near-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.near-item .near-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.near-item .near-dist{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--text2);flex-shrink:0}
+
+/* Dark mode */
+.dark{--bg:#0f1117;--surface:#1a1d27;--surface2:#242833;--border:#2e3340;--text:#f0f2f5;--text2:#a0a8b8;--text3:#636b7e}
+.dark .leaflet-container{background:#0f1117!important}
+.dark .leaflet-control-attribution{background:rgba(15,17,23,.8)!important}
+.dark .marker-cluster-small div{box-shadow:0 0 12px rgba(37,99,235,.4)}
+.dark .marker-cluster-medium div{box-shadow:0 0 12px rgba(217,119,6,.4)}
+.dark .marker-cluster-large div{box-shadow:0 0 12px rgba(220,38,38,.4)}
+
 @media(max-width:768px){
   .panel{width:100vw}
   .logo span.logo-text{display:none}
@@ -204,7 +226,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
   <div class="ctrl-btn" onclick="toggleStats()" title="Statistieken">📊</div>
   <div class="ctrl-btn" id="heatBtn" onclick="toggleHeat()" title="Heatmap">🔥</div>
   <div class="ctrl-btn" id="rangeBtn" onclick="toggleRange()" title="Bereik tonen">📶</div>
+  <div class="ctrl-btn" id="beamBtn" onclick="toggleBeams()" title="Straalrichtingen">📡</div>
   <div class="ctrl-btn" id="measureBtn" onclick="toggleMeasure()" title="Afstand meten">📏</div>
+  <div style="height:1px;background:var(--border);margin:2px 6px"></div>
+  <div class="ctrl-btn" id="darkBtn" onclick="toggleDark()" title="Dark mode">🌙</div>
 </div>
 
 <div class="stats-panel" id="statsPanel">
@@ -246,6 +271,11 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);heigh
     </div>
   </div>
   <div class="pb" id="pBody"></div>
+</div>
+
+<div class="nearest-panel" id="nearestPanel">
+  <h4>📡 Dichtsbijzijnde antennes <button class="close" onclick="closeNearest()">✕</button></h4>
+  <div id="nearestBody"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -390,6 +420,7 @@ async function loadAntennas(){
     updateStats(s);
     if(heatOn)renderHeat();
     if(rangeOn)renderRanges();
+    if(beamOn)renderBeams();
   }catch(e){if(e.name!=='AbortError')console.error(e)}
   finally{document.getElementById('loader').classList.remove('on')}
 }
@@ -760,6 +791,157 @@ function renderRanges(){
   });
 }
 
+// ═══ BEAM DIRECTIONS ═══
+let beamOn=false;
+let beamLayer=L.layerGroup();
+
+function toggleBeams(){
+  beamOn=!beamOn;
+  document.getElementById('beamBtn').classList.toggle('active',beamOn);
+  if(beamOn){
+    renderBeams();
+    map.addLayer(beamLayer);
+    toast('Straalrichtingen aan');
+  }else{
+    map.removeLayer(beamLayer);
+    beamLayer.clearLayers();
+    toast('Straalrichtingen uit');
+  }
+}
+
+async function renderBeams(){
+  beamLayer.clearLayers();
+  if(!beamOn||!allFeatures.length)return;
+  const z=map.getZoom();
+  if(z<14){toast('Zoom verder in voor straalrichtingen');return}
+
+  // Pick visible features (max 50 for performance)
+  const bounds=map.getBounds();
+  const visible=allFeatures.filter(f=>{
+    const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
+    return bounds.contains([lat,lon]);
+  }).slice(0,50);
+
+  // Fetch antenna groups for visible features
+  const allIds=visible.flatMap(f=>(f.properties.ANT_IDS||'').split(',').map(s=>s.trim()).filter(Boolean));
+  if(!allIds.length)return;
+
+  // Batch in chunks of 30
+  for(let i=0;i<allIds.length;i+=30){
+    const chunk=allIds.slice(i,i+30);
+    const filter=chunk.map(id=>`AI_ID=${id}`).join(' OR ');
+    try{
+      const r=await fetch(`https://antenneregister.nl/mapserver/wfs/?service=WFS&version=2.0.0&request=GetFeature&typeName=ms:Antennes_Groepen&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(filter)}`);
+      const data=await r.json();
+      const groups=data.features||[];
+
+      // Find parent location for each AI_ID
+      const idToLL={};
+      visible.forEach(f=>{
+        const ids=(f.properties.ANT_IDS||'').split(',').map(s=>s.trim());
+        const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
+        ids.forEach(id=>{idToLL[id]=[lat,lon]});
+      });
+
+      groups.forEach(g=>{
+        const p=g.properties;
+        if(p.DIR_NONDIR!=='D'||p.HOOFDSTRAALRICHTING==null)return;
+        const ll=idToLL[String(p.AI_ID)];
+        if(!ll)return;
+
+        const angle=p.HOOFDSTRAALRICHTING;
+        const color=satColor(p.SAT_CODE);
+        const len=z>=16?0.003:z>=15?0.005:0.008; // length in degrees
+
+        const rad=(angle-90)*Math.PI/180;
+        const endLat=ll[0]+Math.sin(rad+Math.PI/2)*len;
+        const endLon=ll[1]+Math.cos(rad+Math.PI/2)*len/Math.cos(ll[0]*Math.PI/180);
+
+        const line=L.polyline([ll,[endLat,endLon]],{
+          color:color,weight:2,opacity:0.5,dashArray:'4,4',interactive:false
+        });
+        beamLayer.addLayer(line);
+
+        // Small arrow at the end
+        const arrowSize=len*0.2;
+        const a1Lat=endLat+Math.sin(rad+Math.PI/2+2.7)*arrowSize;
+        const a1Lon=endLon+Math.cos(rad+Math.PI/2+2.7)*arrowSize/Math.cos(ll[0]*Math.PI/180);
+        const a2Lat=endLat+Math.sin(rad+Math.PI/2-2.7)*arrowSize;
+        const a2Lon=endLon+Math.cos(rad+Math.PI/2-2.7)*arrowSize/Math.cos(ll[0]*Math.PI/180);
+        beamLayer.addLayer(L.polyline([[a1Lat,a1Lon],[endLat,endLon],[a2Lat,a2Lon]],{
+          color:color,weight:2,opacity:0.5,interactive:false
+        }));
+      });
+    }catch(e){console.error(e)}
+  }
+}
+
+// ═══ DARK MODE ═══
+let darkMode=loadState().dark||false;
+const lightTiles='https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png';
+const lightLabels='https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png';
+const darkTiles='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
+const darkLabels='https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png';
+let tileBase,tileLabels;
+
+// Store tile layers for swapping
+map.eachLayer(l=>{
+  if(l._url&&l._url.includes('nolabels'))tileBase=l;
+  if(l._url&&l._url.includes('labels'))tileLabels=l;
+});
+
+function applyDark(on){
+  darkMode=on;
+  document.documentElement.classList.toggle('dark',on);
+  document.getElementById('darkBtn').textContent=on?'☀️':'🌙';
+  if(tileBase){tileBase.setUrl(on?darkTiles:lightTiles)}
+  if(tileLabels){tileLabels.setUrl(on?darkLabels:lightLabels)}
+  saveState({dark:on});
+}
+
+function toggleDark(){applyDark(!darkMode)}
+
+// Apply saved preference on load
+if(darkMode)applyDark(true);
+
+// ═══ NEAREST ANTENNA (right-click) ═══
+map.on('contextmenu',function(e){
+  e.originalEvent.preventDefault();
+  showNearest(e.latlng);
+});
+
+function showNearest(latlng){
+  if(!allFeatures.length){toast('Geen data geladen');return}
+  const results=allFeatures.map(f=>{
+    const[lat,lon]=f._ll||RD.toWGS(f.properties.X,f.properties.Y);
+    const dist=latlng.distanceTo(L.latLng(lat,lon));
+    return{f,lat,lon,dist};
+  }).sort((a,b)=>a.dist-b.dist).slice(0,8);
+
+  const body=document.getElementById('nearestBody');
+  body.innerHTML=results.map(r=>{
+    const p=r.f.properties;
+    const t=primaryTech(p);
+    const c=TECHS[t]?.color||'#94a3b8';
+    const d=r.dist>1000?(r.dist/1000).toFixed(1)+' km':Math.round(r.dist)+' m';
+    return`<div class="near-item" onclick="map.setView([${r.lat},${r.lon}],17);showDetail(this._p,${r.lat},${r.lon})" data-pid="${p.ID}">
+      <div class="near-dot" style="background:${c}"></div>
+      <div class="near-info"><div class="near-name">${p.WOONPLAATSNAAM||p.GEMEENTE||'Antenne'}</div><div class="near-sub">${p.HOOFDSOORT||'—'}</div></div>
+      <div class="near-dist">${d}</div>
+    </div>`;
+  }).join('');
+
+  // Attach props for click handler
+  results.forEach((r,i)=>{
+    const el=body.children[i];
+    if(el)el.onclick=()=>{map.setView([r.lat,r.lon],17);showDetail(r.f.properties,r.lat,r.lon)};
+  });
+
+  document.getElementById('nearestPanel').classList.add('show');
+}
+
+function closeNearest(){document.getElementById('nearestPanel').classList.remove('show')}
+
 // ═══ GEOLOCATION ═══
 function geolocate(){
   if(!navigator.geolocation){toast('Locatie niet beschikbaar');return}
@@ -878,6 +1060,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='m'){e.preventDefault();toggleMeasure()}
   if(e.key==='h'){e.preventDefault();toggleHeat()}
   if(e.key==='r'){e.preventDefault();toggleRange()}
+  if(e.key==='b'){e.preventDefault();toggleBeams()}
+  if(e.key==='d'){e.preventDefault();toggleDark()}
   if(e.key==='l'){e.preventDefault();geolocate()}
   if(e.key==='e'){e.preventDefault();toggleDL()}
 });
