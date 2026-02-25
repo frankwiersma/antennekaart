@@ -18,8 +18,13 @@ Each *installation* (Antennes) has an ANT_IDS field — a comma-separated list o
 antenna-group IDs.  Each *antenna panel* (Antennes_Groepen) has an AI_ID field
 that links it back.  One installation typically has 3–30 panels.
 
-NOTE: ~37 % of ANT_IDS have no matching Antennes_Groepen record (server-side
-data gap — this is a known limitation of the source data, not a script bug).
+NOTE: This WFS server has two quirks documented in the source:
+  1. CQL_FILTER is SILENTLY IGNORED — always use OGC XML FILTER
+  2. Blind pagination (startindex) misses records — explicit OGC FILTER
+     queries by AI_ID batch achieve ~96%+ coverage vs ~63% from pagination
+
+The script uses method (2): collect all AI_IDs from Antennes, then fetch
+Antennes_Groepen in batches via OGC XML FILTER for maximum completeness.
 
 USAGE
 -----
@@ -202,7 +207,7 @@ def fetch_wfs(typename: str, count: int = PAGE_SIZE, start_index: int = 0) -> di
 
 
 def fetch_all(typename: str, desc: str = "") -> list:
-    """Paginate through all WFS features for a typename."""
+    """Paginate through all WFS features for a typename (Antennes layer only)."""
     all_features = []
     start = 0
     label = desc or typename
@@ -222,19 +227,112 @@ def fetch_all(typename: str, desc: str = "") -> list:
     return all_features
 
 
+# ─── OGC FILTER helpers (for Antennes_Groepen — pagination gives ~63% coverage) ──
+# Critical discovery: this MapServer silently ignores CQL_FILTER, and blind
+# pagination misses ~37% of records.  Querying explicitly by AI_ID via OGC XML
+# FILTER achieves ~96%+ coverage.  Batch size ≤25 to stay under URL length limits.
+
+BATCH_SIZE = 25   # max AI_IDs per OGC OR-query
+
+
+def _build_ogc_filter(field: str, values: list) -> str:
+    """Build an OGC XML FILTER with OR clauses for multiple field values."""
+    if len(values) == 1:
+        return (
+            f"<Filter>"
+            f"<PropertyIsEqualTo>"
+            f"<PropertyName>{field}</PropertyName>"
+            f"<Literal>{values[0]}</Literal>"
+            f"</PropertyIsEqualTo>"
+            f"</Filter>"
+        )
+    clauses = "".join(
+        f"<PropertyIsEqualTo>"
+        f"<PropertyName>{field}</PropertyName>"
+        f"<Literal>{v}</Literal>"
+        f"</PropertyIsEqualTo>"
+        for v in values
+    )
+    return f"<Filter><Or>{clauses}</Or></Filter>"
+
+
+def fetch_groepen_by_ids(ai_ids: set) -> list:
+    """
+    Fetch Antennes_Groepen panels for specific AI_IDs using OGC XML FILTER.
+    Batches of BATCH_SIZE IDs per request to stay under URL length limits.
+    Rate-limits to be polite to the server.
+    """
+    ids = sorted(ai_ids)
+    total_batches = (len(ids) + BATCH_SIZE - 1) // BATCH_SIZE
+    all_features = []
+
+    for i in range(0, len(ids), BATCH_SIZE):
+        batch = ids[i : i + BATCH_SIZE]
+        batch_num = i // BATCH_SIZE + 1
+
+        if batch_num == 1 or batch_num % 100 == 0 or batch_num == total_batches:
+            pct = batch_num / total_batches * 100
+            print(
+                f"  [Antennes_Groepen] batch {batch_num}/{total_batches}"
+                f" ({pct:.0f}%)  {len(all_features):,} panels so far …",
+                flush=True,
+            )
+
+        ogc_filter = _build_ogc_filter("AI_ID", batch)
+        params = {
+            "service":      "WFS",
+            "request":      "GetFeature",
+            "version":      "2.0.0",
+            "typename":     "Antennes_Groepen",
+            "outputformat": "application/json",
+            "srsname":      "EPSG:28992",
+            "count":        "5000",   # one AI_ID can have many panels
+            "FILTER":       ogc_filter,
+        }
+        url = WFS_URL + "?" + urllib.parse.urlencode(params)
+        raw = _make_request(url)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(f"  ⚠  JSON error at batch {batch_num}: {exc} — skipping", file=sys.stderr)
+            continue
+        all_features.extend(data.get("features", []))
+
+        # Polite rate limiting — 0.3s every 10 batches
+        if batch_num % 10 == 0:
+            time.sleep(0.3)
+
+    return all_features
+
+
 # ─── Core logic ───────────────────────────────────────────────────────────────
 
 def download_and_link() -> list:
     """
     Download Antennes + Antennes_Groepen from WFS, link them, return records.
+
+    Uses OGC XML FILTER to fetch Antennes_Groepen by AI_ID batches (~96%+
+    coverage) instead of blind pagination (~63%).
     """
     print("━━━  Step 1 / 3  Downloading installations (Antennes) …")
     antennes = fetch_all("Antennes", "Antennes")
     print(f"  ✓  {len(antennes):,} installations\n")
 
-    print("━━━  Step 2 / 3  Downloading antenna panels (Antennes_Groepen) …")
-    groepen = fetch_all("Antennes_Groepen", "Antennes_Groepen")
-    print(f"  ✓  {len(groepen):,} panels\n")
+    # Collect all unique AI_IDs referenced across all installations
+    all_ai_ids: set = set()
+    for ant in antennes:
+        ids_str = ant["properties"].get("ANT_IDS", "") or ""
+        for aid in ids_str.replace(",", " ").split():
+            if aid:
+                all_ai_ids.add(aid)
+    print(f"  Unique AI_IDs to fetch: {len(all_ai_ids):,}\n")
+
+    print(f"━━━  Step 2 / 3  Fetching panels via OGC FILTER"
+          f"  ({(len(all_ai_ids) + BATCH_SIZE - 1) // BATCH_SIZE} batches of {BATCH_SIZE}) …")
+    est_min = len(all_ai_ids) // BATCH_SIZE // 3
+    print(f"  Estimated time: ~{est_min}–{est_min*2} min (depends on server speed)\n")
+    groepen = fetch_groepen_by_ids(all_ai_ids)
+    print(f"\n  ✓  {len(groepen):,} panels fetched\n")
 
     print("━━━  Step 3 / 3  Linking installations to panels …")
     groep_lookup: dict = defaultdict(list)
@@ -243,8 +341,6 @@ def download_and_link() -> list:
         if ai_id:
             groep_lookup[ai_id].append(g["properties"])
 
-    print(f"  Unique AI_IDs in panels: {len(groep_lookup):,}")
-
     linked = []
     total_ids = found_ids = missing_ids = 0
 
@@ -252,8 +348,8 @@ def download_and_link() -> list:
         props  = ant["properties"]
         coords = ant.get("geometry", {}).get("coordinates", [None, None])
 
-        ant_ids_str = props.get("ANT_IDS", "") or ""
-        ant_id_list = [s.strip() for s in ant_ids_str.split(",") if s.strip()]
+        ids_str  = props.get("ANT_IDS", "") or ""
+        ant_id_list = [s.strip() for s in ids_str.replace(",", " ").split() if s.strip()]
 
         details = []
         for aid in ant_id_list:
@@ -287,7 +383,8 @@ def download_and_link() -> list:
     pct = found_ids / total_ids * 100 if total_ids else 0
     print(f"  Panel IDs in source : {total_ids:,}")
     print(f"  Matched to panels   : {found_ids:,}  ({pct:.1f} %)")
-    print(f"  No panel data       : {missing_ids:,}  (known WFS data gap)")
+    if missing_ids:
+        print(f"  No panel data       : {missing_ids:,}  ({100-pct:.1f} %) — residual WFS gap")
     return linked
 
 
